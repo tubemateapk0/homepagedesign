@@ -1,5 +1,5 @@
 // =================================================================================
-// CATEGORY PAGE SCRIPT - v6.2 (PERFORMANCE & CLS OPTIMIZED)
+// CATEGORY PAGE SCRIPT - v8.0 (ALL FEATURES RESTORED + OPTIMIZED)
 // =================================================================================
 
 (function() {
@@ -36,28 +36,12 @@
   // =========================================================================
 
   const formatViewers = (num) => {
-    if (num >= 1000) {
-        return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
-    }
+    if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
     return num;
   };
-
-  function formatDateTime(timestamp) {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const isToday = date.toDateString() === now.toDateString();
-    const timeFormat = { hour: "numeric", minute: "2-digit", hour12: true };
-    if (timestamp <= now.getTime()) {
-      return { badge: "LIVE", badgeType: "live", meta: date.toLocaleTimeString("en-US", timeFormat) };
-    }
-    if (isToday) {
-      return { badge: date.toLocaleTimeString("en-US", timeFormat), badgeType: "date", meta: "Today" };
-    }
-    return { badge: date.toLocaleDateString("en-US", { month: "short", day: "numeric" }), badgeType: "date", meta: date.toLocaleTimeString("en-US", timeFormat) };
-  }
-
+  
   function buildPosterUrl(match) {
-    const placeholder = "../Fallbackimage.webp"; // Use absolute path for reliability
+    const placeholder = "../Fallbackimage.webp";
     if (match.teams?.home?.badge && match.teams?.away?.badge) return `${API_BASE}/images/poster/${match.teams.home.badge}/${match.teams.away.badge}.webp`;
     if (match.poster) {
       const p = String(match.poster || "").trim();
@@ -68,6 +52,7 @@
     return placeholder;
   }
 
+  // [UPDATED] createMatchCard now correctly handles viewer badges
   function createMatchCard(match, options = {}) {
     if (!match || !match.id) return document.createDocumentFragment();
     const lazyLoad = options.lazyLoad !== false;
@@ -78,7 +63,7 @@
     const poster = document.createElement("img");
     poster.classList.add("match-poster");
     poster.alt = match.title || "Match Poster";
-    poster.onerror = () => { poster.onerror = null; poster.src = "../Fallbackimage.webp"; }; // Absolute path
+    poster.onerror = () => { poster.onerror = null; poster.src = "../Fallbackimage.webp"; };
     if (lazyLoad) {
       poster.loading = "lazy";
       poster.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
@@ -86,20 +71,33 @@
     } else {
       poster.src = buildPosterUrl(match);
     }
-    card.appendChild(poster);
     
-    const { badge, badgeType, meta } = formatDateTime(match.date);
-    const statusBadge = document.createElement("div");
-    statusBadge.classList.add("status-badge", badgeType);
+    // --- Badge Logic ---
+    const date = new Date(match.date);
+    const now = new Date();
+    const timeFormat = { hour: "numeric", minute: "2-digit", hour12: true };
+    let metaText = date.toLocaleTimeString("en-US", timeFormat);
+    let statusBadgeHTML;
+    const isLive = match.date <= now.getTime();
 
-    if (match.viewers > 0) {
-      statusBadge.classList.add("viewer-badge", "live");
-      const eyeIconSVG = `<svg class="viewer-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"></path></svg>`;
-      statusBadge.innerHTML = `<span>${formatViewers(match.viewers)}</span>${eyeIconSVG}`;
+    if (isLive && match.viewers > 0) {
+        const eyeIconSVG = `<svg class="viewer-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"></path></svg>`;
+        statusBadgeHTML = `<div class="status-badge live viewer-badge"><span>${formatViewers(match.viewers)}</span>${eyeIconSVG}</div>`;
+    } else if (isLive) {
+        statusBadgeHTML = `<div class="status-badge live">LIVE</div>`;
     } else {
-      statusBadge.textContent = badge;
+        let badgeText;
+        if (date.toDateString() === now.toDateString()) {
+            badgeText = date.toLocaleTimeString("en-US", timeFormat);
+            metaText = "Today";
+        } else {
+            badgeText = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        }
+        statusBadgeHTML = `<div class="status-badge date">${badgeText}</div>`;
     }
-    card.appendChild(statusBadge);
+    
+    card.append(poster);
+    card.insertAdjacentHTML('beforeend', statusBadgeHTML);
 
     if (match.popular === true) {
       const popularBadge = document.createElement("div");
@@ -111,26 +109,19 @@
     
     const info = document.createElement("div");
     info.classList.add("match-info");
-    const title = document.createElement("div");
-    title.classList.add("match-title");
-    title.textContent = match.title || "Untitled Match";
-    const metaRow = document.createElement("div");
-    metaRow.classList.add("match-meta-row");
-    const categorySpan = document.createElement("span");
-    categorySpan.classList.add("match-category");
-    categorySpan.textContent = match.category ? match.category.charAt(0).toUpperCase() + match.category.slice(1) : "Unknown";
-    const timeOrDate = document.createElement("span");
-    timeOrDate.textContent = meta;
-    
-    metaRow.append(categorySpan, timeOrDate);
-    info.append(title, metaRow);
+    info.innerHTML = `
+      <div class="match-title">${match.title || "Untitled Match"}</div>
+      <div class="match-meta-row">
+        <span class="match-category">${match.category ? match.category.charAt(0).toUpperCase() + match.category.slice(1) : "Unknown"}</span>
+        <span>${metaText}</span>
+      </div>`;
     card.appendChild(info);
     
     return card;
   }
 
   function initiateDelayedImageLoading() {
-    const lazyImages = document.querySelectorAll('img[data-src]');
+    const lazyImages = matchesContainer.querySelectorAll('img[data-src]');
     const imageObserver = new IntersectionObserver((entries, observer) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
@@ -144,9 +135,7 @@
     lazyImages.forEach(img => imageObserver.observe(img));
   }
 
-  // =========================================================================
-  // === FILTERING & DATE GROUPING LOGIC ===
-  // =========================================================================
+  // [UPDATED] renderMatches with new sorting and grouping logic
   function renderMatches() {
     let matchesToRender = [...categoryMatchesCache];
     if (currentFilters.live) {
@@ -161,169 +150,161 @@
       matchesToRender = matchesToRender.filter(match => match.popular === true);
     }
     
-    matchesToRender.sort((a, b) => {
-        const aIsLive = a.date <= Date.now();
-        const bIsLive = b.date <= Date.now();
-        if (aIsLive && bIsLive) return (b.viewers || 0) - (a.viewers || 0);
-        return a.date - b.date;
-    });
-    
     matchesContainer.innerHTML = "";
     messageContainer.style.display = 'none';
 
     if (matchesToRender.length === 0) {
+      matchesContainer.appendChild(skeletonLoader).style.display = 'none';
       messageContainer.textContent = "No matches found with the selected filters.";
       messageContainer.style.display = 'block';
-      skeletonLoader.style.display = 'none';
       return;
     }
     
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const twentyFourSevenMatches = matchesToRender.filter(m => m.date < today.getTime());
-    const upcomingMatches = matchesToRender.filter(m => m.date >= today.getTime());
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    twentyFourSevenMatches.sort((a, b) => (b.viewers || 0) - (a.viewers || 0));
+    // --- NEW SORTING GROUPS ---
+    const liveWithViewers = matchesToRender.filter(m => m.viewers > 0);
+    const otherLiveNoViewers = matchesToRender.filter(m => m.date <= now.getTime() && !(m.viewers > 0));
+    const upcoming = matchesToRender.filter(m => m.date > now.getTime());
+    const old247 = otherLiveNoViewers.filter(m => m.date < todayStart.getTime());
+    
+    liveWithViewers.sort((a, b) => b.viewers - a.viewers);
 
-    const groupedByDate = upcomingMatches.reduce((acc, match) => {
-        const matchDate = new Date(match.date);
-        const dateKey = new Date(matchDate.getFullYear(), matchDate.getMonth(), matchDate.getDate()).toISOString();
+    const groupedUpcoming = upcoming.reduce((acc, match) => {
+        const dateKey = new Date(match.date).toISOString().split('T')[0];
         if (!acc[dateKey]) acc[dateKey] = [];
         acc[dateKey].push(match);
         return acc;
     }, {});
     
-    Object.keys(groupedByDate).forEach(dateKey => {
-      groupedByDate[dateKey].sort((a,b) => {
-        const aIsLive = a.date <= Date.now();
-        const bIsLive = b.date <= Date.now();
-        if (aIsLive && bIsLive) return (b.viewers || 0) - (a.viewers || 0);
-        if (aIsLive) return -1;
-        if (bIsLive) return 1;
-        return a.date - b.date;
-      });
-    });
+    // --- RENDER LOGIC ---
+    const fragment = document.createDocumentFragment();
 
-    Object.keys(groupedByDate).sort().forEach(dateKey => {
-        const date = new Date(dateKey);
-        const isToday = date.toDateString() === now.toDateString();
-        const dayLabel = isToday ? 'TODAY' : date.toLocaleDateString([], { weekday: 'short' }).toUpperCase();
+    // Today section includes live with viewers + upcoming today
+    const todaySection = document.createElement('div');
+    todaySection.className = 'date-section';
+    const todayDate = new Date();
+    const todayLabel = 'TODAY';
+    const todayDateLabel = todayDate.toLocaleDateString([], { day: 'numeric', month: 'short' }).toUpperCase();
+    todaySection.innerHTML = `<h2 class="section-header">${todayLabel} <span class="date-day">${todayDateLabel}</span></h2>`;
+    
+    const todayGrid = document.createElement('div');
+    todayGrid.className = 'results-grid';
+    
+    // Add live matches with viewers first
+    liveWithViewers.forEach(match => todayGrid.appendChild(createMatchCard(match)));
+
+    // Add today's upcoming matches
+    const todayKey = todayDate.toISOString().split('T')[0];
+    if (groupedUpcoming[todayKey]) {
+        groupedUpcoming[todayKey].sort((a,b) => a.date - b.date).forEach(match => todayGrid.appendChild(createMatchCard(match)));
+        delete groupedUpcoming[todayKey]; // Remove from future processing
+    }
+    
+    if (todayGrid.hasChildNodes()) {
+      todaySection.appendChild(todayGrid);
+      fragment.appendChild(todaySection);
+    }
+
+    // Render future dates
+    Object.keys(groupedUpcoming).sort().forEach(dateKey => {
+        const date = new Date(dateKey + 'T00:00:00'); // Ensure correct date parsing
+        const dayLabel = date.toLocaleDateString([], { weekday: 'short' }).toUpperCase();
         const dateLabel = date.toLocaleDateString([], { day: 'numeric', month: 'short' }).toUpperCase();
         const section = document.createElement('div');
         section.className = 'date-section';
         section.innerHTML = `<h2 class="section-header">${dayLabel} <span class="date-day">${dateLabel}</span></h2>`;
         const grid = document.createElement('div');
         grid.className = 'results-grid';
-        groupedByDate[dateKey].forEach(match => grid.appendChild(createMatchCard(match)));
+        groupedUpcoming[dateKey].sort((a,b) => a.date - b.date).forEach(match => grid.appendChild(createMatchCard(match)));
         section.appendChild(grid);
-        matchesContainer.appendChild(section);
+        fragment.appendChild(section);
     });
 
-    if (twentyFourSevenMatches.length > 0) {
+    // Render 24/7 section at the bottom (only old matches with no viewers)
+    if (old247.length > 0) {
         const section = document.createElement('div');
         section.className = 'date-section';
         section.innerHTML = `<h2 class="section-header">24/7 FREE</h2>`;
         const grid = document.createElement('div');
         grid.className = 'results-grid';
-        twentyFourSevenMatches.forEach(match => grid.appendChild(createMatchCard(match)));
+        old247.sort((a,b) => b.date - a.date).forEach(match => grid.appendChild(createMatchCard(match)));
         section.appendChild(grid);
-        matchesContainer.appendChild(section);
+        fragment.appendChild(section);
     }
+    
+    matchesContainer.appendChild(fragment);
 
     updateActiveFiltersUI();
     initiateDelayedImageLoading();
-    skeletonLoader.style.display = 'none';
   }
   
   // URL & UI STATE MANAGEMENT
   function updateUrlWithFilters(){const params=new URLSearchParams;currentFilters.live&&params.set("live","true"),currentFilters.popular&&params.set("popular","true"),"all"!==currentFilters.source&&params.set("source",currentFilters.source);const queryString=params.toString(),newUrl=`${window.location.pathname}${queryString?`?${queryString}`:""}${window.location.hash}`;history.replaceState(null,"",newUrl)}
   function updateActiveFiltersUI(){activeFiltersContainer.innerHTML="";const createTag=(key,text)=>{const tag=document.createElement("div");tag.className="active-filter-tag",tag.dataset.filterKey=key,tag.innerHTML=`<span>${text}</span><button class="remove-filter-btn" data-filter-key="${key}">&times;</button>`,activeFiltersContainer.appendChild(tag)};currentFilters.live&&createTag("live","Live"),currentFilters.popular&&createTag("popular","Popular"),"all"!==currentFilters.source&&createTag("source",`${currentFilters.source}`)}
 
-  // EVENT LISTENERS & ROUTING
+  // [RESTORED] EVENT LISTENERS
   function setupEventListeners(){filterToggleBtn.addEventListener("click",()=>filterBar.classList.toggle("is-expanded")),filterOptions.addEventListener("click",e=>{const target=e.target.closest(".filter-btn");if(target){const filterKey=target.dataset.filter;currentFilters[filterKey]=!currentFilters[filterKey],target.classList.toggle("active",currentFilters[filterKey]),updateUrlWithFilters(),renderMatches()}}),sourceSelect.addEventListener("change",()=>{currentFilters.source=sourceSelect.value,updateUrlWithFilters(),renderMatches()}),
   categorySelect.addEventListener('change', () => {
-    window.location.hash = `/${categorySelect.value}`;
+    window.location.hash = `/${categorySelect.value.replace(/\s+/g, '-').toLowerCase()}`;
   }),
   activeFiltersContainer.addEventListener("click",e=>{const target=e.target.closest(".remove-filter-btn");if(target){const key=target.dataset.filterKey;"boolean"==typeof currentFilters[key]?(currentFilters[key]=!1,document.querySelector(`.filter-btn[data-filter="${key}"]`)?.classList.remove("active")):(currentFilters[key]="all",sourceSelect.value="all"),updateUrlWithFilters(),renderMatches()}})}
   
   function populateFilterDropdowns(currentCategory){
     categorySelect.innerHTML = CATEGORIES.map(cat => {
       const isSelected = cat === currentCategory ? 'selected' : '';
-      const displayText = cat === 'all' 
-        ? 'All Sports' 
-        : cat.replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+      const displayText = cat === 'all' ? 'All Sports' : cat.replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase());
       return `<option value="${cat}" ${isSelected}>${displayText}</option>`;
     }).join('');
-
     sourceSelect.innerHTML='<option value="all">All Sources</option>',SOURCES.forEach(source=>{const capitalizedSource=source.charAt(0).toUpperCase()+source.slice(1);sourceSelect.innerHTML+=`<option value="${source}">${capitalizedSource}</option>`}),sourceSelect.value=currentFilters.source
   }
   
-  // [OPTIMIZED] This is the core logic with the two-stage render
+  // [UPDATED] Main route handling function with two-stage render
   async function handleRouteChange() {
     let categoryName = window.location.hash.substring(2).toLowerCase() || "all";
     if (!CATEGORIES.includes(categoryName)) categoryName = "all";
     
-    // --- Initial Setup ---
     const urlParams = new URLSearchParams(window.location.search);
-    currentFilters = {
-        live: urlParams.get('live') === 'true',
-        popular: urlParams.get('popular') === 'true',
-        source: urlParams.get('source') || 'all'
-    };
-    
+    currentFilters.live = urlParams.get('live') === 'true';
+    currentFilters.popular = urlParams.get('popular') === 'true';
+    currentFilters.source = urlParams.get('source') || 'all';
+
     const formattedName = (categoryName === 'all' ? 'All Sports' : categoryName.replace(/-/g, ' '));
-    const pageTitleText = `buffstreams.world ${formattedName.replace(/\b\w/g, l => l.toUpperCase())} Matches`;
-    pageTitle.textContent = pageTitleText;
-    titleElement.textContent = pageTitleText;
-    
+    pageTitle.textContent = `buffstreams.world ${formattedName.replace(/\b\w/g, l => l.toUpperCase())} Matches`;
+    titleElement.textContent = pageTitle.textContent;
+
     matchesContainer.innerHTML = "";
-    skeletonLoader.style.display = "grid";
+    matchesContainer.appendChild(skeletonLoader).style.display = "grid";
     messageContainer.style.display = "none";
     document.querySelector('.filter-btn[data-filter="live"]').classList.toggle('active', currentFilters.live);
     document.querySelector('.filter-btn[data-filter="popular"]').classList.toggle('active', currentFilters.popular);
     updateActiveFiltersUI();
-    populateFilterDropdowns(categoryName);
-
+    
     try {
-      // --- STAGE 1: FETCH & RENDER INITIAL DATA FAST ---
+      // STAGE 1: Initial fetch
       const apiUrl = (categoryName === 'all') ? `${API_BASE}/matches/all` : `${API_BASE}/matches/${categoryName}`;
       const response = await fetch(apiUrl);
       if (!response.ok) throw new Error(`API error: ${response.status}`);
-      categoryMatchesCache = await response.json();
+      categoryMatchesCache = (await response.json()).map(m => ({...m, viewers: 0 }));
       
-      if (!categoryMatchesCache || categoryMatchesCache.length === 0) {
-        messageContainer.textContent = `No matches found for ${formattedName}. Check back later!`;
-        messageContainer.style.display = "block";
-        skeletonLoader.style.display = 'none';
-        return;
-      }
+      populateFilterDropdowns(categoryName);
+      renderMatches(); // First render (no viewers, sorted by date)
       
-      renderMatches(); // First render with basic data
-
-      // --- STAGE 2: ASYNCHRONOUSLY FETCH & ENHANCE WITH VIEWER DATA ---
+      // STAGE 2: Enhance with viewer data
       const liveMatches = categoryMatchesCache.filter(match => match.date <= Date.now());
       if (liveMatches.length > 0) {
-        const streamFetchPromises = liveMatches.flatMap(match =>
-          match.sources.map(source =>
-            fetch(`${API_BASE}/stream/${source.source}/${source.id}`)
-              .then(res => res.ok ? res.json() : [])
-              .then(streams => ({ matchId: match.id, streams }))
-          )
-        );
-        const results = await Promise.allSettled(streamFetchPromises);
+        const streamPromises = liveMatches.flatMap(match => match.sources.map(source => fetch(`${API_BASE}/stream/${source.source}/${source.id}`).then(res => res.ok ? res.json() : []).then(streams => ({ matchId: match.id, streams }))));
+        const results = await Promise.allSettled(streamPromises);
         const viewerCounts = {};
         results.forEach(result => {
           if (result.status === 'fulfilled' && result.value) {
             const { matchId, streams } = result.value;
             if (!viewerCounts[matchId]) viewerCounts[matchId] = 0;
-            streams.forEach(stream => {
-              if (stream.viewers && typeof stream.viewers === 'number') {
-                viewerCounts[matchId] += stream.viewers;
-              }
-            });
+            streams.forEach(stream => { if (stream.viewers) viewerCounts[matchId] += stream.viewers; });
           }
         });
-        
+
         let viewersFound = false;
         categoryMatchesCache.forEach(match => {
           if (viewerCounts[match.id]) {
@@ -332,20 +313,17 @@
           }
         });
 
-        if (viewersFound) {
-            renderMatches(); // Second render to re-sort and add viewer badges
-        }
+        if (viewersFound) renderMatches(); // Re-render with viewer data and new sorting
       }
-
     } catch (error) {
-      console.error("Failed to load category matches:", error);
+      console.error("Failed to load matches:", error);
       skeletonLoader.style.display = 'none';
-      messageContainer.textContent = "Could not load matches. Please check your connection and try again.",
+      messageContainer.textContent = "Could not load matches. Please try again.",
       messageContainer.style.display = "block";
     }
   }
 
-  // SEARCH FUNCTIONALITY
+  // [RESTORED] SEARCH FUNCTIONALITY
   async function fetchAllMatchesForSearch(){try{const res=await fetch(`${API_BASE}/matches/all`);if(!res.ok)throw new Error("Failed to fetch search data");const allMatches=await res.json();const map=new Map;allMatches.forEach(m=>map.set(m.id,m)),allMatchesForSearch=Array.from(map.values())}catch(err){console.error("Error fetching search data:",err)}}
   function setupSearch(){const searchInput=document.getElementById("search-input"),searchOverlay=document.getElementById("search-overlay"),overlayInput=document.getElementById("overlay-search-input"),overlayResults=document.getElementById("overlay-search-results"),searchClose=document.getElementById("search-close");if(searchInput){searchInput.addEventListener("focus",()=>{searchOverlay.style.display="flex",overlayInput.value=searchInput.value,overlayInput.focus(),overlayResults.innerHTML=""}),searchClose.addEventListener("click",()=>{searchOverlay.style.display="none"}),searchOverlay.addEventListener("click",e=>{e.target.closest(".search-overlay-content")||(searchOverlay.style.display="none")}),overlayInput.addEventListener("input",function(){const q=this.value.trim().toLowerCase();if(overlayResults.innerHTML="",!q)return;const filtered=allMatchesForSearch.filter(m=>(m.title||"").toLowerCase().includes(q)||(m.league||"").toLowerCase().includes(q)||(m.teams?.home?.name||"").toLowerCase().includes(q)||(m.teams?.away?.name||"").toLowerCase().includes(q));filtered.slice(0,12).forEach(match=>{const item=document.createElement("div");item.className="search-result-item",item.appendChild(createMatchCard(match,{lazyLoad:!1})),overlayResults.appendChild(item)})}),overlayInput.addEventListener("keydown",e=>{if("Enter"===e.key){const q=overlayInput.value.trim();q&&(window.location.href=`../SearchResult/?q=${encodeURIComponent(q)}`)}})}}
 
