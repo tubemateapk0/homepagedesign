@@ -60,7 +60,7 @@
   }
 
   function buildPosterUrl(match) {
-    const placeholder = "/Fallbackimage.webp";
+    const placeholder = "../Fallbackimage.webp";
     if (match.teams?.home?.badge && match.teams?.away?.badge) return `${API_BASE}/images/poster/${match.teams.home.badge}/${match.teams.away.badge}.webp`;
     if (match.poster) {
       const p = String(match.poster || "").trim();
@@ -82,7 +82,7 @@
     const poster = document.createElement("img");
     poster.classList.add("match-poster");
     poster.alt = match.title || "Match Poster";
-    poster.onerror = () => { poster.onerror = null; poster.src = "/Fallbackimage.webp"; };
+    poster.onerror = () => { poster.onerror = null; poster.src = "../Fallbackimage.webp"; };
     if (lazyLoad) {
       poster.loading = "lazy";
       poster.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
@@ -372,3 +372,4 @@
   fetchAllMatchesForSearch().then(setupSearch);
 
 })();
+
