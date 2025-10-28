@@ -60,7 +60,7 @@
   }
 
   function buildPosterUrl(match) {
-    const placeholder = "/Fallbackimage.webp";
+    const placeholder = "../Fallbackimage.webp";
     if (match.teams?.home?.badge && match.teams?.away?.badge) return `${API_BASE}/images/poster/${match.teams.home.badge}/${match.teams.away.badge}.webp`;
     if (match.poster) {
       const p = String(match.poster || "").trim();
@@ -82,7 +82,7 @@
     const poster = document.createElement("img");
     poster.classList.add("match-poster");
     poster.alt = match.title || "Match Poster";
-    poster.onerror = () => { poster.onerror = null; poster.src = "/Fallbackimage.webp"; };
+    poster.onerror = () => { poster.onerror = null; poster.src = "../Fallbackimage.webp"; };
     if (lazyLoad) {
       poster.loading = "lazy";
       poster.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
@@ -159,97 +159,120 @@
   // =========================================================================
   // === FILTERING & DATE GROUPING LOGIC ===
   // =========================================================================
-  // [UPDATED] renderMatches now sorts by viewers and renders 24/7 section last
-  function renderMatches() {
-    let matchesToRender = [...categoryMatchesCache];
-    if (currentFilters.live) {
-      matchesToRender = matchesToRender.filter(match => match.date <= Date.now());
-    }
-    if (currentFilters.source !== 'all') {
-      matchesToRender = matchesToRender.filter(match => 
-        match.sources && match.sources.some(s => s.source.toLowerCase() === currentFilters.source)
-      );
-    }
-    if (currentFilters.popular) {
-      matchesToRender = matchesToRender.filter(match => match.popular === true);
-    }
-    
-    matchesToRender.sort((a, b) => {
-        const aIsLive = a.date <= Date.now();
-        const bIsLive = b.date <= Date.now();
-        if (aIsLive && bIsLive) return (b.viewers || 0) - (a.viewers || 0);
-        return a.date - b.date;
-    });
-    
-    matchesContainer.innerHTML = "";
-    messageContainer.style.display = 'none';
-
-    if (matchesToRender.length === 0) {
-      messageContainer.textContent = "No matches found with the selected filters.";
-      messageContainer.style.display = 'block';
-      return;
-    }
-    
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const twentyFourSevenMatches = matchesToRender.filter(m => m.date < today.getTime());
-    const upcomingMatches = matchesToRender.filter(m => m.date >= today.getTime());
-
-    // Sort the 24/7 section by viewers
-    twentyFourSevenMatches.sort((a, b) => (b.viewers || 0) - (a.viewers || 0));
-
-    const groupedByDate = upcomingMatches.reduce((acc, match) => {
-        const matchDate = new Date(match.date);
-        const dateKey = new Date(matchDate.getFullYear(), matchDate.getMonth(), matchDate.getDate()).toISOString();
-        if (!acc[dateKey]) acc[dateKey] = [];
-        acc[dateKey].push(match);
-        return acc;
-    }, {});
-    
-    // Sort matches within each date group, prioritizing live/viewed matches
-    Object.keys(groupedByDate).forEach(dateKey => {
-      groupedByDate[dateKey].sort((a,b) => {
-        const aIsLive = a.date <= Date.now();
-        const bIsLive = b.date <= Date.now();
-        if (aIsLive && bIsLive) return (b.viewers || 0) - (a.viewers || 0);
-        if (aIsLive) return -1;
-        if (bIsLive) return 1;
-        return a.date - b.date;
-      });
-    });
-
-    // --- RENDER SECTIONS --- (Upcoming first)
-    Object.keys(groupedByDate).sort().forEach(dateKey => {
-        const date = new Date(dateKey);
-        const isToday = date.toDateString() === now.toDateString();
-        const dayLabel = isToday ? 'TODAY' : date.toLocaleDateString([], { weekday: 'short' }).toUpperCase();
-        const dateLabel = date.toLocaleDateString([], { day: 'numeric', month: 'short' }).toUpperCase();
-        const section = document.createElement('div');
-        section.className = 'date-section';
-        section.innerHTML = `<h2 class="section-header">${dayLabel} <span class="date-day">${dateLabel}</span></h2>`;
-        const grid = document.createElement('div');
-        grid.className = 'results-grid';
-        groupedByDate[dateKey].forEach(match => grid.appendChild(createMatchCard(match)));
-        section.appendChild(grid);
-        matchesContainer.appendChild(section);
-    });
-
-    // --- RENDER 24/7 SECTION LAST ---
-    if (twentyFourSevenMatches.length > 0) {
-        const section = document.createElement('div');
-        section.className = 'date-section';
-        section.innerHTML = `<h2 class="section-header">24/7 FREE</h2>`;
-        const grid = document.createElement('div');
-        grid.className = 'results-grid';
-        twentyFourSevenMatches.forEach(match => grid.appendChild(createMatchCard(match)));
-        section.appendChild(grid);
-        matchesContainer.appendChild(section);
-    }
-
-    updateActiveFiltersUI();
-    initiateDelayedImageLoading();
+// =========================================================================
+// === REPLACE THE EXISTING renderMatches FUNCTION WITH THIS NEW VERSION ===
+// =========================================================================
+function renderMatches() {
+  let matchesToRender = [...categoryMatchesCache];
+  // --- Apply active filters ---
+  if (currentFilters.live) {
+    matchesToRender = matchesToRender.filter(match => match.date <= Date.now());
   }
+  if (currentFilters.source !== 'all') {
+    matchesToRender = matchesToRender.filter(match => 
+      match.sources && match.sources.some(s => s.source.toLowerCase() === currentFilters.source)
+    );
+  }
+  if (currentFilters.popular) {
+    matchesToRender = matchesToRender.filter(match => match.popular === true);
+  }
+
+  // --- Clear previous content and check if there are any matches ---
+  matchesContainer.innerHTML = ""; // This will clear the skeleton loader
+  messageContainer.style.display = 'none';
+
+  if (matchesToRender.length === 0) {
+    messageContainer.textContent = "No matches found with the selected filters.";
+    messageContainer.style.display = 'block';
+    return;
+  }
+
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  // --- NEW LOGIC: Separate matches into three distinct groups ---
   
+  // 1. Any match with viewers, regardless of its date.
+  const liveWithViewers = matchesToRender.filter(m => m.viewers > 0);
+  
+  // 2. Upcoming/Today's matches that DO NOT have viewers.
+  const upcomingOrToday = matchesToRender.filter(m => m.date >= todayStart.getTime() && !(m.viewers > 0));
+  
+  // 3. 24/7 matches that DO NOT have viewers.
+  const old247 = matchesToRender.filter(m => m.date < todayStart.getTime() && !(m.viewers > 0));
+
+  // --- Sort each group independently ---
+  liveWithViewers.sort((a, b) => (b.viewers || 0) - (a.viewers || 0));
+  upcomingOrToday.sort((a, b) => a.date - b.date);
+  old247.sort((a, b) => b.date - a.date); // Most recent first
+
+  // Group upcoming matches by date for section creation
+  const groupedUpcoming = upcomingOrToday.reduce((acc, match) => {
+    const matchDate = new Date(match.date);
+    const dateKey = new Date(matchDate.getFullYear(), matchDate.getMonth(), matchDate.getDate()).toISOString();
+    if (!acc[dateKey]) acc[dateKey] = [];
+    acc[dateKey].push(match);
+    return acc;
+  }, {});
+
+  const fragment = document.createDocumentFragment();
+  const todayKey = todayStart.toISOString();
+
+  // --- RENDER TODAY SECTION ---
+  // This section will contain matches with viewers AND other matches scheduled for today.
+  const todayMatchesExist = liveWithViewers.length > 0 || groupedUpcoming[todayKey];
+  if (todayMatchesExist) {
+    const section = document.createElement('div');
+    section.className = 'date-section';
+    const dateLabel = now.toLocaleDateString([], { day: 'numeric', month: 'short' }).toUpperCase();
+    section.innerHTML = `<h2 class="section-header">TODAY <span class="date-day">${dateLabel}</span></h2>`;
+    const grid = document.createElement('div');
+    grid.className = 'results-grid';
+    
+    // Add matches with viewers first
+    liveWithViewers.forEach(match => grid.appendChild(createMatchCard(match)));
+    
+    // Add other matches for today
+    if (groupedUpcoming[todayKey]) {
+      groupedUpcoming[todayKey].forEach(match => grid.appendChild(createMatchCard(match)));
+    }
+    
+    section.appendChild(grid);
+    fragment.appendChild(section);
+  }
+
+  // --- RENDER FUTURE DATE SECTIONS ---
+  Object.keys(groupedUpcoming).sort().forEach(dateKey => {
+    if (dateKey === todayKey) return; // Skip today, it's already rendered
+    const date = new Date(dateKey);
+    const dayLabel = date.toLocaleDateString([], { weekday: 'short' }).toUpperCase();
+    const dateLabel = date.toLocaleDateString([], { day: 'numeric', month: 'short' }).toUpperCase();
+    const section = document.createElement('div');
+    section.className = 'date-section';
+    section.innerHTML = `<h2 class="section-header">${dayLabel} <span class="date-day">${dateLabel}</span></h2>`;
+    const grid = document.createElement('div');
+    grid.className = 'results-grid';
+    groupedUpcoming[dateKey].forEach(match => grid.appendChild(createMatchCard(match)));
+    section.appendChild(grid);
+    fragment.appendChild(section);
+  });
+  
+  // --- RENDER 24/7 SECTION (only matches without viewers) ---
+  if (old247.length > 0) {
+    const section = document.createElement('div');
+    section.className = 'date-section';
+    section.innerHTML = `<h2 class="section-header">24/7 FREE</h2>`;
+    const grid = document.createElement('div');
+    grid.className = 'results-grid';
+    old247.forEach(match => grid.appendChild(createMatchCard(match)));
+    section.appendChild(grid);
+    fragment.appendChild(section);
+  }
+
+  matchesContainer.appendChild(fragment);
+  updateActiveFiltersUI();
+  initiateDelayedImageLoading();
+}
   // =========================================================================
   // === URL & UI STATE MANAGEMENT ===
   // =========================================================================
