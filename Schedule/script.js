@@ -1,5 +1,5 @@
 // =================================================================================
-// CATEGORY PAGE SCRIPT - v6.1 (CLS FIX)
+// CATEGORY PAGE SCRIPT - v6.2 (PERFORMANCE & CLS OPTIMIZED)
 // =================================================================================
 
 (function() {
@@ -18,9 +18,7 @@
   const SOURCES = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "intel"];
   const API_BASE = 'https://streamed.pk/api';
 
-  // =========================================================================
-  // === DOM ELEMENTS ===
-  // =========================================================================
+  // DOM ELEMENTS
   const matchesContainer = document.getElementById("matches-container");
   const messageContainer = document.getElementById("message-container");
   const titleElement = document.getElementById("category-title");
@@ -59,7 +57,7 @@
   }
 
   function buildPosterUrl(match) {
-    const placeholder = "../Fallbackimage.webp";
+    const placeholder = "../Fallbackimage.webp"; // Use absolute path for reliability
     if (match.teams?.home?.badge && match.teams?.away?.badge) return `${API_BASE}/images/poster/${match.teams.home.badge}/${match.teams.away.badge}.webp`;
     if (match.poster) {
       const p = String(match.poster || "").trim();
@@ -80,7 +78,7 @@
     const poster = document.createElement("img");
     poster.classList.add("match-poster");
     poster.alt = match.title || "Match Poster";
-    poster.onerror = () => { poster.onerror = null; poster.src = "../Fallbackimage.webp"; };
+    poster.onerror = () => { poster.onerror = null; poster.src = "../Fallbackimage.webp"; }; // Absolute path
     if (lazyLoad) {
       poster.loading = "lazy";
       poster.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
@@ -133,24 +131,17 @@
 
   function initiateDelayedImageLoading() {
     const lazyImages = document.querySelectorAll('img[data-src]');
-    if ('IntersectionObserver' in window) {
-      const imageObserver = new IntersectionObserver((entries, observer) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            const img = entry.target;
-            img.src = img.dataset.src;
-            img.removeAttribute('data-src');
-            observer.unobserve(img);
-          }
-        });
-      }, { rootMargin: "100px" });
-      lazyImages.forEach(img => imageObserver.observe(img));
-    } else {
-        lazyImages.forEach(img => {
-            img.src = img.dataset.src;
-            img.removeAttribute('data-src');
-        });
-    }
+    const imageObserver = new IntersectionObserver((entries, observer) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const img = entry.target;
+          img.src = img.dataset.src;
+          img.removeAttribute('data-src');
+          observer.unobserve(img);
+        }
+      });
+    }, { rootMargin: "100px" });
+    lazyImages.forEach(img => imageObserver.observe(img));
   }
 
   // =========================================================================
@@ -183,7 +174,7 @@
     if (matchesToRender.length === 0) {
       messageContainer.textContent = "No matches found with the selected filters.";
       messageContainer.style.display = 'block';
-      skeletonLoader.style.display = 'none'; // [FIX] Hide loader if no matches
+      skeletonLoader.style.display = 'none';
       return;
     }
     
@@ -241,26 +232,18 @@
 
     updateActiveFiltersUI();
     initiateDelayedImageLoading();
-    skeletonLoader.style.display = 'none'; // [MOVED & ADDED] Hide loader only after rendering is complete
+    skeletonLoader.style.display = 'none';
   }
   
-  // =========================================================================
-  // === URL & UI STATE MANAGEMENT ===
-  // =========================================================================
+  // URL & UI STATE MANAGEMENT
   function updateUrlWithFilters(){const params=new URLSearchParams;currentFilters.live&&params.set("live","true"),currentFilters.popular&&params.set("popular","true"),"all"!==currentFilters.source&&params.set("source",currentFilters.source);const queryString=params.toString(),newUrl=`${window.location.pathname}${queryString?`?${queryString}`:""}${window.location.hash}`;history.replaceState(null,"",newUrl)}
-  
   function updateActiveFiltersUI(){activeFiltersContainer.innerHTML="";const createTag=(key,text)=>{const tag=document.createElement("div");tag.className="active-filter-tag",tag.dataset.filterKey=key,tag.innerHTML=`<span>${text}</span><button class="remove-filter-btn" data-filter-key="${key}">&times;</button>`,activeFiltersContainer.appendChild(tag)};currentFilters.live&&createTag("live","Live"),currentFilters.popular&&createTag("popular","Popular"),"all"!==currentFilters.source&&createTag("source",`${currentFilters.source}`)}
 
-  // =========================================================================
-  // === EVENT LISTENERS & ROUTING ===
-  // =========================================================================
+  // EVENT LISTENERS & ROUTING
   function setupEventListeners(){filterToggleBtn.addEventListener("click",()=>filterBar.classList.toggle("is-expanded")),filterOptions.addEventListener("click",e=>{const target=e.target.closest(".filter-btn");if(target){const filterKey=target.dataset.filter;currentFilters[filterKey]=!currentFilters[filterKey],target.classList.toggle("active",currentFilters[filterKey]),updateUrlWithFilters(),renderMatches()}}),sourceSelect.addEventListener("change",()=>{currentFilters.source=sourceSelect.value,updateUrlWithFilters(),renderMatches()}),
-  
   categorySelect.addEventListener('change', () => {
-    const newCategory = categorySelect.value;
-    window.location.hash = `/${newCategory.charAt(0).toUpperCase() + newCategory.slice(1)}`;
+    window.location.hash = `/${categorySelect.value}`;
   }),
-  
   activeFiltersContainer.addEventListener("click",e=>{const target=e.target.closest(".remove-filter-btn");if(target){const key=target.dataset.filterKey;"boolean"==typeof currentFilters[key]?(currentFilters[key]=!1,document.querySelector(`.filter-btn[data-filter="${key}"]`)?.classList.remove("active")):(currentFilters[key]="all",sourceSelect.value="all"),updateUrlWithFilters(),renderMatches()}})}
   
   function populateFilterDropdowns(currentCategory){
@@ -275,41 +258,49 @@
     sourceSelect.innerHTML='<option value="all">All Sources</option>',SOURCES.forEach(source=>{const capitalizedSource=source.charAt(0).toUpperCase()+source.slice(1);sourceSelect.innerHTML+=`<option value="${source}">${capitalizedSource}</option>`}),sourceSelect.value=currentFilters.source
   }
   
+  // [OPTIMIZED] This is the core logic with the two-stage render
   async function handleRouteChange() {
     let categoryName = window.location.hash.substring(2).toLowerCase() || "all";
     if (!CATEGORIES.includes(categoryName)) categoryName = "all";
     
+    // --- Initial Setup ---
     const urlParams = new URLSearchParams(window.location.search);
-    currentFilters.live = urlParams.get('live') === 'true';
-    currentFilters.popular = urlParams.get('popular') === 'true';
-    currentFilters.source = urlParams.get('source') || 'all';
-
-    const isAllSports = categoryName === 'all';
-    const formattedName = isAllSports ? 'All Sports' : categoryName.replace(/-/g, ' ');
-    const pageTitleText = `buffstreams.world ${formattedName.replace(/\b\w/g, l => l.toUpperCase())} Matches`;
+    currentFilters = {
+        live: urlParams.get('live') === 'true',
+        popular: urlParams.get('popular') === 'true',
+        source: urlParams.get('source') || 'all'
+    };
     
+    const formattedName = (categoryName === 'all' ? 'All Sports' : categoryName.replace(/-/g, ' '));
+    const pageTitleText = `buffstreams.world ${formattedName.replace(/\b\w/g, l => l.toUpperCase())} Matches`;
     pageTitle.textContent = pageTitleText;
     titleElement.textContent = pageTitleText;
+    
     matchesContainer.innerHTML = "";
-    skeletonLoader.style.display = "grid"; // Make sure loader is visible
+    skeletonLoader.style.display = "grid";
     messageContainer.style.display = "none";
     document.querySelector('.filter-btn[data-filter="live"]').classList.toggle('active', currentFilters.live);
     document.querySelector('.filter-btn[data-filter="popular"]').classList.toggle('active', currentFilters.popular);
     updateActiveFiltersUI();
+    populateFilterDropdowns(categoryName);
 
     try {
-      const apiUrl = isAllSports ? `${API_BASE}/matches/all` : `${API_BASE}/matches/${categoryName}`;
+      // --- STAGE 1: FETCH & RENDER INITIAL DATA FAST ---
+      const apiUrl = (categoryName === 'all') ? `${API_BASE}/matches/all` : `${API_BASE}/matches/${categoryName}`;
       const response = await fetch(apiUrl);
       if (!response.ok) throw new Error(`API error: ${response.status}`);
       categoryMatchesCache = await response.json();
       
       if (!categoryMatchesCache || categoryMatchesCache.length === 0) {
-        skeletonLoader.style.display = 'none';
         messageContainer.textContent = `No matches found for ${formattedName}. Check back later!`;
         messageContainer.style.display = "block";
+        skeletonLoader.style.display = 'none';
         return;
       }
       
+      renderMatches(); // First render with basic data
+
+      // --- STAGE 2: ASYNCHRONOUSLY FETCH & ENHANCE WITH VIEWER DATA ---
       const liveMatches = categoryMatchesCache.filter(match => match.date <= Date.now());
       if (liveMatches.length > 0) {
         const streamFetchPromises = liveMatches.flatMap(match =>
@@ -332,16 +323,19 @@
             });
           }
         });
+        
+        let viewersFound = false;
         categoryMatchesCache.forEach(match => {
           if (viewerCounts[match.id]) {
             match.viewers = viewerCounts[match.id];
+            viewersFound = true;
           }
         });
+
+        if (viewersFound) {
+            renderMatches(); // Second render to re-sort and add viewer badges
+        }
       }
-      
-      // [REMOVED] The problematic line was here.
-      populateFilterDropdowns(categoryName);
-      renderMatches();
 
     } catch (error) {
       console.error("Failed to load category matches:", error);
@@ -351,9 +345,7 @@
     }
   }
 
-  // =========================================================================
-  // === SEARCH FUNCTIONALITY ===
-  // =========================================================================
+  // SEARCH FUNCTIONALITY
   async function fetchAllMatchesForSearch(){try{const res=await fetch(`${API_BASE}/matches/all`);if(!res.ok)throw new Error("Failed to fetch search data");const allMatches=await res.json();const map=new Map;allMatches.forEach(m=>map.set(m.id,m)),allMatchesForSearch=Array.from(map.values())}catch(err){console.error("Error fetching search data:",err)}}
   function setupSearch(){const searchInput=document.getElementById("search-input"),searchOverlay=document.getElementById("search-overlay"),overlayInput=document.getElementById("overlay-search-input"),overlayResults=document.getElementById("overlay-search-results"),searchClose=document.getElementById("search-close");if(searchInput){searchInput.addEventListener("focus",()=>{searchOverlay.style.display="flex",overlayInput.value=searchInput.value,overlayInput.focus(),overlayResults.innerHTML=""}),searchClose.addEventListener("click",()=>{searchOverlay.style.display="none"}),searchOverlay.addEventListener("click",e=>{e.target.closest(".search-overlay-content")||(searchOverlay.style.display="none")}),overlayInput.addEventListener("input",function(){const q=this.value.trim().toLowerCase();if(overlayResults.innerHTML="",!q)return;const filtered=allMatchesForSearch.filter(m=>(m.title||"").toLowerCase().includes(q)||(m.league||"").toLowerCase().includes(q)||(m.teams?.home?.name||"").toLowerCase().includes(q)||(m.teams?.away?.name||"").toLowerCase().includes(q));filtered.slice(0,12).forEach(match=>{const item=document.createElement("div");item.className="search-result-item",item.appendChild(createMatchCard(match,{lazyLoad:!1})),overlayResults.appendChild(item)})}),overlayInput.addEventListener("keydown",e=>{if("Enter"===e.key){const q=overlayInput.value.trim();q&&(window.location.href=`../SearchResult/?q=${encodeURIComponent(q)}`)}})}}
 
