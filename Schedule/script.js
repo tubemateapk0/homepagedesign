@@ -1,5 +1,5 @@
 // =================================================================================
-// CATEGORY PAGE SCRIPT - v5.7 (FINAL) WITH "ALL" CATEGORY FILTER
+// CATEGORY PAGE SCRIPT - v6.0 (WITH LIVE VIEWER SORTING)
 // =================================================================================
 
 (function() {
@@ -14,9 +14,9 @@
     source: 'all',
   };
 
-  // *** UPDATED: Added "all" to the CATEGORIES array
   const CATEGORIES = ["all", "football", "basketball", "baseball","motor-sports", "american-football", "afl", "fight", "hockey", "tennis", "rugby", "golf", "billiards", "cricket", "darts", "other"];
   const SOURCES = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "intel"];
+  const API_BASE = 'https://streamed.pk/api';
 
   // =========================================================================
   // === DOM ELEMENTS ===
@@ -36,6 +36,15 @@
   // =========================================================================
   // === HELPER & RENDERING FUNCTIONS ===
   // =========================================================================
+
+  // [NEW] Viewer count formatting function from homepage
+  const formatViewers = (num) => {
+    if (num >= 1000) {
+        return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+    }
+    return num;
+  };
+
   function formatDateTime(timestamp) {
     const date = new Date(timestamp);
     const now = new Date();
@@ -52,16 +61,17 @@
 
   function buildPosterUrl(match) {
     const placeholder = "/Fallbackimage.webp";
-    if (match.teams?.home?.badge && match.teams?.away?.badge) return `https://streamed.pk/api/images/poster/${match.teams.home.badge}/${match.teams.away.badge}.webp`;
+    if (match.teams?.home?.badge && match.teams?.away?.badge) return `${API_BASE}/images/poster/${match.teams.home.badge}/${match.teams.away.badge}.webp`;
     if (match.poster) {
       const p = String(match.poster || "").trim();
       if (p.startsWith("http")) return p;
       if (p.startsWith("/")) return `https://streamed.pk${p.endsWith(".webp")?p:p+".webp"}`;
-      return `https://streamed.pk/api/images/proxy/${p}.webp`;
+      return `${API_BASE}/images/proxy/${p}.webp`;
     }
     return placeholder;
   }
 
+  // [UPDATED] createMatchCard now handles viewer badges
   function createMatchCard(match, options = {}) {
     if (!match || !match.id) return document.createDocumentFragment();
     const lazyLoad = options.lazyLoad !== false;
@@ -80,13 +90,21 @@
     } else {
       poster.src = buildPosterUrl(match);
     }
+    card.appendChild(poster);
     
     const { badge, badgeType, meta } = formatDateTime(match.date);
     const statusBadge = document.createElement("div");
     statusBadge.classList.add("status-badge", badgeType);
-    statusBadge.textContent = badge;
 
-    card.append(poster, statusBadge);
+    // --- Viewer Badge Logic ---
+    if (match.viewers > 0) {
+      statusBadge.classList.add("viewer-badge", "live");
+      const eyeIconSVG = `<svg class="viewer-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"></path></svg>`;
+      statusBadge.innerHTML = `<span>${formatViewers(match.viewers)}</span>${eyeIconSVG}`;
+    } else {
+      statusBadge.textContent = badge;
+    }
+    card.appendChild(statusBadge);
 
     if (match.popular === true) {
       const popularBadge = document.createElement("div");
@@ -141,6 +159,7 @@
   // =========================================================================
   // === FILTERING & DATE GROUPING LOGIC ===
   // =========================================================================
+  // [UPDATED] renderMatches now sorts by viewers and renders 24/7 section last
   function renderMatches() {
     let matchesToRender = [...categoryMatchesCache];
     if (currentFilters.live) {
@@ -155,7 +174,12 @@
       matchesToRender = matchesToRender.filter(match => match.popular === true);
     }
     
-    matchesToRender.sort((a, b) => a.date - b.date);
+    matchesToRender.sort((a, b) => {
+        const aIsLive = a.date <= Date.now();
+        const bIsLive = b.date <= Date.now();
+        if (aIsLive && bIsLive) return (b.viewers || 0) - (a.viewers || 0);
+        return a.date - b.date;
+    });
     
     matchesContainer.innerHTML = "";
     messageContainer.style.display = 'none';
@@ -171,6 +195,9 @@
     const twentyFourSevenMatches = matchesToRender.filter(m => m.date < today.getTime());
     const upcomingMatches = matchesToRender.filter(m => m.date >= today.getTime());
 
+    // Sort the 24/7 section by viewers
+    twentyFourSevenMatches.sort((a, b) => (b.viewers || 0) - (a.viewers || 0));
+
     const groupedByDate = upcomingMatches.reduce((acc, match) => {
         const matchDate = new Date(match.date);
         const dateKey = new Date(matchDate.getFullYear(), matchDate.getMonth(), matchDate.getDate()).toISOString();
@@ -179,17 +206,19 @@
         return acc;
     }, {});
     
-    if (twentyFourSevenMatches.length > 0) {
-        const section = document.createElement('div');
-        section.className = 'date-section';
-        section.innerHTML = `<h2 class="section-header">24/7 FREE</h2>`;
-        const grid = document.createElement('div');
-        grid.className = 'results-grid';
-        twentyFourSevenMatches.forEach(match => grid.appendChild(createMatchCard(match)));
-        section.appendChild(grid);
-        matchesContainer.appendChild(section);
-    }
-    
+    // Sort matches within each date group, prioritizing live/viewed matches
+    Object.keys(groupedByDate).forEach(dateKey => {
+      groupedByDate[dateKey].sort((a,b) => {
+        const aIsLive = a.date <= Date.now();
+        const bIsLive = b.date <= Date.now();
+        if (aIsLive && bIsLive) return (b.viewers || 0) - (a.viewers || 0);
+        if (aIsLive) return -1;
+        if (bIsLive) return 1;
+        return a.date - b.date;
+      });
+    });
+
+    // --- RENDER SECTIONS --- (Upcoming first)
     Object.keys(groupedByDate).sort().forEach(dateKey => {
         const date = new Date(dateKey);
         const isToday = date.toDateString() === now.toDateString();
@@ -204,6 +233,18 @@
         section.appendChild(grid);
         matchesContainer.appendChild(section);
     });
+
+    // --- RENDER 24/7 SECTION LAST ---
+    if (twentyFourSevenMatches.length > 0) {
+        const section = document.createElement('div');
+        section.className = 'date-section';
+        section.innerHTML = `<h2 class="section-header">24/7 FREE</h2>`;
+        const grid = document.createElement('div');
+        grid.className = 'results-grid';
+        twentyFourSevenMatches.forEach(match => grid.appendChild(createMatchCard(match)));
+        section.appendChild(grid);
+        matchesContainer.appendChild(section);
+    }
 
     updateActiveFiltersUI();
     initiateDelayedImageLoading();
@@ -228,7 +269,6 @@
   
   activeFiltersContainer.addEventListener("click",e=>{const target=e.target.closest(".remove-filter-btn");if(target){const key=target.dataset.filterKey;"boolean"==typeof currentFilters[key]?(currentFilters[key]=!1,document.querySelector(`.filter-btn[data-filter="${key}"]`)?.classList.remove("active")):(currentFilters[key]="all",sourceSelect.value="all"),updateUrlWithFilters(),renderMatches()}})}
   
-  // *** UPDATED: Logic to handle "All Sports" in dropdown ***
   function populateFilterDropdowns(currentCategory){
     categorySelect.innerHTML = CATEGORIES.map(cat => {
       const isSelected = cat === currentCategory ? 'selected' : '';
@@ -241,8 +281,8 @@
     sourceSelect.innerHTML='<option value="all">All Sources</option>',SOURCES.forEach(source=>{const capitalizedSource=source.charAt(0).toUpperCase()+source.slice(1);sourceSelect.innerHTML+=`<option value="${source}">${capitalizedSource}</option>`}),sourceSelect.value=currentFilters.source
   }
   
+  // [UPDATED] handleRouteChange now fetches viewer data before rendering
   async function handleRouteChange() {
-    // Default to 'all' if no category is specified in the URL hash
     let categoryName = window.location.hash.substring(2).toLowerCase() || "all";
     if (!CATEGORIES.includes(categoryName)) categoryName = "all";
     
@@ -251,7 +291,6 @@
     currentFilters.popular = urlParams.get('popular') === 'true';
     currentFilters.source = urlParams.get('source') || 'all';
 
-    // *** UPDATED: Logic to handle titles and API endpoint for "All Sports" ***
     const isAllSports = categoryName === 'all';
     const formattedName = isAllSports ? 'All Sports' : categoryName.replace(/-/g, ' ');
     const pageTitleText = `buffstreams.world ${formattedName.replace(/\b\w/g, l => l.toUpperCase())} Matches`;
@@ -266,21 +305,49 @@
     updateActiveFiltersUI();
 
     try {
-      const apiUrl = isAllSports
-        ? 'https://streamed.pk/api/matches/all'
-        : `https://streamed.pk/api/matches/${categoryName}`;
-        
+      const apiUrl = isAllSports ? `${API_BASE}/matches/all` : `${API_BASE}/matches/${categoryName}`;
       const response = await fetch(apiUrl);
       if (!response.ok) throw new Error(`API error: ${response.status}`);
       categoryMatchesCache = await response.json();
-      skeletonLoader.style.display = 'none';
-
+      
       if (!categoryMatchesCache || categoryMatchesCache.length === 0) {
+        skeletonLoader.style.display = 'none';
         messageContainer.textContent = `No matches found for ${formattedName}. Check back later!`;
         messageContainer.style.display = "block";
         return;
       }
       
+      // --- Fetch viewer counts for live matches before rendering ---
+      const liveMatches = categoryMatchesCache.filter(match => match.date <= Date.now());
+      if (liveMatches.length > 0) {
+        const streamFetchPromises = liveMatches.flatMap(match =>
+          match.sources.map(source =>
+            fetch(`${API_BASE}/stream/${source.source}/${source.id}`)
+              .then(res => res.ok ? res.json() : [])
+              .then(streams => ({ matchId: match.id, streams }))
+          )
+        );
+        const results = await Promise.allSettled(streamFetchPromises);
+        const viewerCounts = {};
+        results.forEach(result => {
+          if (result.status === 'fulfilled' && result.value) {
+            const { matchId, streams } = result.value;
+            if (!viewerCounts[matchId]) viewerCounts[matchId] = 0;
+            streams.forEach(stream => {
+              if (stream.viewers && typeof stream.viewers === 'number') {
+                viewerCounts[matchId] += stream.viewers;
+              }
+            });
+          }
+        });
+        categoryMatchesCache.forEach(match => {
+          if (viewerCounts[match.id]) {
+            match.viewers = viewerCounts[match.id];
+          }
+        });
+      }
+      
+      skeletonLoader.style.display = 'none';
       populateFilterDropdowns(categoryName);
       renderMatches();
 
@@ -295,7 +362,7 @@
   // =========================================================================
   // === SEARCH FUNCTIONALITY ===
   // =========================================================================
-  async function fetchAllMatchesForSearch(){try{const res=await fetch("https://streamed.pk/api/matches/all");if(!res.ok)throw new Error("Failed to fetch search data");const allMatches=await res.json();const map=new Map;allMatches.forEach(m=>map.set(m.id,m)),allMatchesForSearch=Array.from(map.values())}catch(err){console.error("Error fetching search data:",err)}}
+  async function fetchAllMatchesForSearch(){try{const res=await fetch(`${API_BASE}/matches/all`);if(!res.ok)throw new Error("Failed to fetch search data");const allMatches=await res.json();const map=new Map;allMatches.forEach(m=>map.set(m.id,m)),allMatchesForSearch=Array.from(map.values())}catch(err){console.error("Error fetching search data:",err)}}
   function setupSearch(){const searchInput=document.getElementById("search-input"),searchOverlay=document.getElementById("search-overlay"),overlayInput=document.getElementById("overlay-search-input"),overlayResults=document.getElementById("overlay-search-results"),searchClose=document.getElementById("search-close");if(searchInput){searchInput.addEventListener("focus",()=>{searchOverlay.style.display="flex",overlayInput.value=searchInput.value,overlayInput.focus(),overlayResults.innerHTML=""}),searchClose.addEventListener("click",()=>{searchOverlay.style.display="none"}),searchOverlay.addEventListener("click",e=>{e.target.closest(".search-overlay-content")||(searchOverlay.style.display="none")}),overlayInput.addEventListener("input",function(){const q=this.value.trim().toLowerCase();if(overlayResults.innerHTML="",!q)return;const filtered=allMatchesForSearch.filter(m=>(m.title||"").toLowerCase().includes(q)||(m.league||"").toLowerCase().includes(q)||(m.teams?.home?.name||"").toLowerCase().includes(q)||(m.teams?.away?.name||"").toLowerCase().includes(q));filtered.slice(0,12).forEach(match=>{const item=document.createElement("div");item.className="search-result-item",item.appendChild(createMatchCard(match,{lazyLoad:!1})),overlayResults.appendChild(item)})}),overlayInput.addEventListener("keydown",e=>{if("Enter"===e.key){const q=overlayInput.value.trim();q&&(window.location.href=`../SearchResult/?q=${encodeURIComponent(q)}`)}})}}
 
   // === START THE APP ===
@@ -305,6 +372,3 @@
   fetchAllMatchesForSearch().then(setupSearch);
 
 })();
-
-
-
