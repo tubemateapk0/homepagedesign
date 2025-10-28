@@ -102,6 +102,34 @@ margin-left: 5px;
   background: rgba(0,0,0,0.7);
 }
 
+/* === [NEW] VIEWER BADGE STYLES === */
+.status-badge.viewer-badge {
+    display: flex;
+    align-items: center;
+    gap: 5px; /* Space between dot, text, and icon */
+    padding: 3px 8px; /* Slightly more padding */
+}
+.status-badge.viewer-badge::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    background-color: #fff;
+    border-radius: 50%;
+    animation: pulse-white 1.5s infinite;
+}
+.status-badge .viewer-icon {
+    width: 1.1em; /* Scales with the font size of the badge */
+    height: 1.1em;
+    opacity: 0.8;
+    margin-left: 2px;
+}
+@keyframes pulse-white {
+    0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+    70% { box-shadow: 0 0 0 7px rgba(255, 255, 255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+}
+
+
 /* NEW POPULAR BADGE STYLE */
 .popular-badge {
   position: absolute;
