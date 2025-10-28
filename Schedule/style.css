@@ -377,7 +377,15 @@ margin-left: 5px;
     width: auto;
   }
 }
+/* ADD THIS CLASS TO YOUR CSS FILE FOR THE SKELETON HEADER */
 
+.section-header.is-loading {
+  height: 2.5em; /* Match the approximate height of a real header */
+  width: 40%;
+  border-radius: 6px;
+  border-bottom: none !important; /* Override default border */
+  margin-bottom: 1rem;
+}
 
 .disclaimer-box{background:#111;color:#ddd;padding:15px 20px;margin-bottom:20px;border:1px solid #333;border-radius:8px;max-width:900px;margin-left:auto;margin-right:auto;text-align:left;box-shadow:0 0 10px rgba(0,0,0,.4)}.disclaimer-box h3{margin:0 0 8px;font-size:16px;color:#fc0;text-transform:uppercase;letter-spacing:1px}.disclaimer-box p{margin:0;font-size:14px;line-height:1.5;padding-bottom:10px!important}.disclaimer-box a{color:#fc0;text-decoration:underline}.disclaimer-box a:hover{color:#fff}
 
