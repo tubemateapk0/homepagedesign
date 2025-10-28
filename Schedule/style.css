@@ -298,6 +298,15 @@ margin-left: 5px;
   padding: 0.5rem 0;
 }
 
+/* [NEW] Style for the skeleton header to ensure correct height */
+.section-header.is-loading {
+  height: 2.5em; /* Match the approximate height of a real header */
+  width: 40%;
+  border-radius: 6px;
+  border-bottom: none !important; /* Override default border */
+  margin-bottom: 1rem;
+}
+
 /* SKELETON LOADER FOR THE GRID (FROM HOMEPAGE) */
 .is-loading { background-color: var(--placeholder-bg); position: relative; overflow: hidden; border-color: var(--placeholder-bg) !important; color: transparent !important; cursor: default; pointer-events: none; }
 .is-loading > * { visibility: hidden; }
@@ -307,6 +316,8 @@ margin-left: 5px;
   width: auto;
   aspect-ratio: 200 / 173;
 }
+
+
 
 /* ANIMATIONS (FROM HOMEPAGE) */
 @keyframes pulse-red{0%,100%{opacity:1}50%{opacity:.8}}
