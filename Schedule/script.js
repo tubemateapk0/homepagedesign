@@ -1,5 +1,5 @@
 // =================================================================================
-// CATEGORY PAGE SCRIPT - v6.0 (WITH LIVE VIEWER SORTING)
+// CATEGORY PAGE SCRIPT - v6.1 (CLS FIX)
 // =================================================================================
 
 (function() {
@@ -37,7 +37,6 @@
   // === HELPER & RENDERING FUNCTIONS ===
   // =========================================================================
 
-  // [NEW] Viewer count formatting function from homepage
   const formatViewers = (num) => {
     if (num >= 1000) {
         return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
@@ -71,7 +70,6 @@
     return placeholder;
   }
 
-  // [UPDATED] createMatchCard now handles viewer badges
   function createMatchCard(match, options = {}) {
     if (!match || !match.id) return document.createDocumentFragment();
     const lazyLoad = options.lazyLoad !== false;
@@ -96,7 +94,6 @@
     const statusBadge = document.createElement("div");
     statusBadge.classList.add("status-badge", badgeType);
 
-    // --- Viewer Badge Logic ---
     if (match.viewers > 0) {
       statusBadge.classList.add("viewer-badge", "live");
       const eyeIconSVG = `<svg class="viewer-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"></path></svg>`;
@@ -159,7 +156,6 @@
   // =========================================================================
   // === FILTERING & DATE GROUPING LOGIC ===
   // =========================================================================
-  // [UPDATED] renderMatches now sorts by viewers and renders 24/7 section last
   function renderMatches() {
     let matchesToRender = [...categoryMatchesCache];
     if (currentFilters.live) {
@@ -187,6 +183,7 @@
     if (matchesToRender.length === 0) {
       messageContainer.textContent = "No matches found with the selected filters.";
       messageContainer.style.display = 'block';
+      skeletonLoader.style.display = 'none'; // [FIX] Hide loader if no matches
       return;
     }
     
@@ -195,7 +192,6 @@
     const twentyFourSevenMatches = matchesToRender.filter(m => m.date < today.getTime());
     const upcomingMatches = matchesToRender.filter(m => m.date >= today.getTime());
 
-    // Sort the 24/7 section by viewers
     twentyFourSevenMatches.sort((a, b) => (b.viewers || 0) - (a.viewers || 0));
 
     const groupedByDate = upcomingMatches.reduce((acc, match) => {
@@ -206,7 +202,6 @@
         return acc;
     }, {});
     
-    // Sort matches within each date group, prioritizing live/viewed matches
     Object.keys(groupedByDate).forEach(dateKey => {
       groupedByDate[dateKey].sort((a,b) => {
         const aIsLive = a.date <= Date.now();
@@ -218,7 +213,6 @@
       });
     });
 
-    // --- RENDER SECTIONS --- (Upcoming first)
     Object.keys(groupedByDate).sort().forEach(dateKey => {
         const date = new Date(dateKey);
         const isToday = date.toDateString() === now.toDateString();
@@ -234,7 +228,6 @@
         matchesContainer.appendChild(section);
     });
 
-    // --- RENDER 24/7 SECTION LAST ---
     if (twentyFourSevenMatches.length > 0) {
         const section = document.createElement('div');
         section.className = 'date-section';
@@ -248,6 +241,7 @@
 
     updateActiveFiltersUI();
     initiateDelayedImageLoading();
+    skeletonLoader.style.display = 'none'; // [MOVED & ADDED] Hide loader only after rendering is complete
   }
   
   // =========================================================================
@@ -281,7 +275,6 @@
     sourceSelect.innerHTML='<option value="all">All Sources</option>',SOURCES.forEach(source=>{const capitalizedSource=source.charAt(0).toUpperCase()+source.slice(1);sourceSelect.innerHTML+=`<option value="${source}">${capitalizedSource}</option>`}),sourceSelect.value=currentFilters.source
   }
   
-  // [UPDATED] handleRouteChange now fetches viewer data before rendering
   async function handleRouteChange() {
     let categoryName = window.location.hash.substring(2).toLowerCase() || "all";
     if (!CATEGORIES.includes(categoryName)) categoryName = "all";
@@ -298,7 +291,7 @@
     pageTitle.textContent = pageTitleText;
     titleElement.textContent = pageTitleText;
     matchesContainer.innerHTML = "";
-    skeletonLoader.style.display = "grid";
+    skeletonLoader.style.display = "grid"; // Make sure loader is visible
     messageContainer.style.display = "none";
     document.querySelector('.filter-btn[data-filter="live"]').classList.toggle('active', currentFilters.live);
     document.querySelector('.filter-btn[data-filter="popular"]').classList.toggle('active', currentFilters.popular);
@@ -317,7 +310,6 @@
         return;
       }
       
-      // --- Fetch viewer counts for live matches before rendering ---
       const liveMatches = categoryMatchesCache.filter(match => match.date <= Date.now());
       if (liveMatches.length > 0) {
         const streamFetchPromises = liveMatches.flatMap(match =>
@@ -347,7 +339,7 @@
         });
       }
       
-      skeletonLoader.style.display = 'none';
+      // [REMOVED] The problematic line was here.
       populateFilterDropdowns(categoryName);
       renderMatches();
 
@@ -372,4 +364,3 @@
   fetchAllMatchesForSearch().then(setupSearch);
 
 })();
-
