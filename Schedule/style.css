@@ -102,7 +102,7 @@ margin-left: 5px;
   background: rgba(0,0,0,0.7);
 }
 
-/* === VIEWER BADGE STYLES === */
+/* === [NEW] VIEWER BADGE STYLES === */
 .status-badge.viewer-badge {
     display: flex;
     align-items: center;
@@ -130,7 +130,7 @@ margin-left: 5px;
 }
 
 
-/* POPULAR BADGE STYLE */
+/* NEW POPULAR BADGE STYLE */
 .popular-badge {
   position: absolute;
   top: 10px;
@@ -202,11 +202,6 @@ margin-left: 5px;
 /* ================================== */
 /* === CATEGORY PAGE SPECIFIC STYLES === */
 /* ================================== */
-
-/* --- [CLS FIX] --- */
-#matches-container {
-  min-height: 70vh; /* Prevents the container from collapsing during load */
-}
 
 #category-title {
   font-size: clamp(1.5rem, 3vw, 2rem);
@@ -331,16 +326,17 @@ margin-left: 5px;
 @media (max-width: 768px) {
   .filter-bar { top: 53px; }
   
+  /* UPDATED: Corrected Filter button alignment */
   .filter-toggle-btn {
     display: flex;
     width: 100%;
     align-items: center;
   }
   .filter-toggle-btn .arrow {
-    margin-left: auto;
+    margin-left: auto; /* Push arrow to the far right */
   }
   .filter-toggle-btn::before {
-      display: inline-block;
+      display: inline-block; /* Show the icon */
   }
 
   .filter-options { display: none; flex-direction: column; align-items: stretch; }
@@ -401,4 +397,3 @@ footer {
 @media (max-width: 480px) {
 #sticky-footer-ad .ad-content {padding: 0 10px;}
 }
-
