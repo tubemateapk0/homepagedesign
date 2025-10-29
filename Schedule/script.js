@@ -1,5 +1,5 @@
 // =================================================================================
-// CATEGORY PAGE SCRIPT - v8.0 (Corrected, Fully Functional & Optimized)
+// CATEGORY PAGE SCRIPT - v8.1 (Final with Stable Sorting)
 // =================================================================================
 
 (function() {
@@ -141,7 +141,7 @@
             observer.unobserve(img);
           }
         });
-      }, { rootMargin: "200px" }); // Increased margin to load images sooner
+      }, { rootMargin: "200px" });
       lazyImages.forEach(img => imageObserver.observe(img));
     } else {
         lazyImages.forEach(img => {
@@ -151,7 +151,6 @@
     }
   }
   
-  // [FIX] Rewritten renderMatches to correctly handle live viewers from any section
   function renderMatches() {
       let matchesToRender = [...categoryMatchesCache];
       if (currentFilters.live) {
@@ -177,11 +176,17 @@
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const todayKey = todayStart.toISOString();
 
-      // [FIX] Logic Change: ANY match with viewers is considered a "live" match for grouping.
       const liveMatchesWithViewers = matchesToRender.filter(m => m.viewers > 0);
       const otherMatches = matchesToRender.filter(m => !(m.viewers > 0));
 
-      liveMatchesWithViewers.sort((a, b) => (b.viewers || 0) - (a.viewers || 0));
+      // [IMPROVEMENT] Add secondary sort by date for tie-breaking
+      liveMatchesWithViewers.sort((a, b) => {
+        const viewerDiff = (b.viewers || 0) - (a.viewers || 0);
+        if (viewerDiff !== 0) {
+          return viewerDiff;
+        }
+        return b.date - a.date; // If viewers are same, newest match first
+      });
 
       const upcomingOrToday = otherMatches.filter(m => m.date >= todayStart.getTime());
       const old247 = otherMatches.filter(m => m.date < todayStart.getTime());
@@ -297,7 +302,6 @@
       }), sourceSelect.value = currentFilters.source
   }
   
-  // [FIX] Corrected and simplified the viewer fetching and DOM update logic
   async function fetchAndUpdateViewers() {
       const liveMatchesForApiCall = categoryMatchesCache.filter(match => match.date <= Date.now() && match.sources?.length > 0);
       if (liveMatchesForApiCall.length === 0) return;
@@ -337,7 +341,6 @@
           }
       });
       
-      // [FIX] Instead of complex DOM manipulation, just re-render the matches. It's cleaner and guarantees correctness.
       if (needsRerender) {
           renderMatches();
       }
@@ -357,10 +360,9 @@
       pageTitle.textContent = pageTitleText;
       titleElement.textContent = pageTitleText;
       
-      // [FIX] Correctly manage loading state to prevent layout shift
       matchesContainer.innerHTML = "";
       skeletonLoader.style.display = "grid";
-      matchesContainer.classList.add('is-loading-matches'); // Add class to reserve space
+      matchesContainer.classList.add('is-loading-matches');
       messageContainer.style.display = "none";
       
       document.querySelector('.filter-btn[data-filter="live"]').classList.toggle('active', currentFilters.live);
@@ -378,17 +380,15 @@
           if (!categoryMatchesCache || categoryMatchesCache.length === 0) {
               messageContainer.textContent = `No matches found for ${formattedName}. Check back later!`;
               messageContainer.style.display = "block";
-              matchesContainer.classList.remove('is-loading-matches'); // Ensure class is removed
+              matchesContainer.classList.remove('is-loading-matches');
               return;
           }
           
           populateFilterDropdowns(categoryName);
           
-          // Phase 1: Initial Render (without viewers)
           renderMatches();
-          matchesContainer.classList.remove('is-loading-matches'); // Remove class after first render
+          matchesContainer.classList.remove('is-loading-matches');
 
-          // Phase 2: Fetch viewers and re-render if necessary
           fetchAndUpdateViewers();
 
       } catch (error) {
@@ -396,7 +396,7 @@
           skeletonLoader.style.display = 'none';
           messageContainer.textContent = "Could not load matches. Please check your connection and try again.";
           messageContainer.style.display = "block";
-          matchesContainer.classList.remove('is-loading-matches'); // Ensure class is removed on error
+          matchesContainer.classList.remove('is-loading-matches');
       }
   }
 
