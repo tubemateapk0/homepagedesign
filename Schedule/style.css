@@ -23,6 +23,11 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ADD THIS CLASS TO YOUR CSS FILE TO PREVENT LAYOUT SHIFT */
+#matches-container.is-loading-matches {
+  min-height: 100vh; /* Reserves screen height to prevent footer jumping */
+}
+
 /* HEADER & NAVIGATION BUTTONS (FROM HOMEPAGE) */
 .header-btn {
   transition: background-color 0.2s, border-color 0.2s, transform 0.2s;
@@ -405,3 +410,4 @@ footer {
 @media (max-width: 480px) {
 #sticky-footer-ad .ad-content {padding: 0 10px;}
 }
+
