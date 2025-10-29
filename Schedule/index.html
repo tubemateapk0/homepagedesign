@@ -9,13 +9,13 @@
   <link rel="dns-prefetch" href="//streamed.pk"> 
   <style>
     :root{--bg-primary:#0a0a0a;--bg-secondary:#161b22;--text-primary:#c9d1d9;--text-secondary:#8b949e;--accent-primary:#e40f0f;--border-color:#262626;--shadow-color:rgba(0,0,0,.2)}*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg-primary);color:var(--text-primary)}.fullpage{padding:0 1rem}.site-header{position:sticky;top:0;left:0;width:100%;background:var(--bg-primary);border-bottom:1px solid var(--border-color);padding:10px 20px;display:flex;justify-content:space-between;align-items:center;z-index:1000;box-shadow:0 2px 6px var(--shadow-color);margin-bottom:0}.header-left,.header-right{display:flex;align-items:center;gap:12px}.site-logo img{height:40px;border-radius:6px;display:block}.header-btn{display:inline-flex;align-items:center;justify-content:center;padding:8px 14px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;white-space:nowrap;background-color:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-color)}.header-btn-discord{background-color:#5865f2;color:#fff;border:1px solid #5865f2}.header-search{flex-grow:1;max-width:400px}.header-search input{background:var(--bg-secondary);color:var(--text-primary);padding:8px 12px;font-size:14px;border:2px solid var(--border-color);border-radius:6px;outline:0;width:100%}
-    /* [CLS FIX] Reserve space for the main title to prevent layout shift */
     #category-title { min-height: 2.5em; display: flex; align-items: center; justify-content: center; }
     @media(max-width:768px){.site-logo{display:none}.header-search{max-width:100%}.site-header{padding:8px 12px}}@media(max-width:480px){.header-search{max-width:140px}.header-search input{font-size:12px}.header-left,.header-right{gap:7px}}
   </style>
   <link rel="preload" href="style.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="style.css"></noscript>
   <script src="script.js" defer></script>
+  <!-- [MODIFIED] Defer the mobile detect script as well -->
   <script src="/mobiledetectscript.js" defer></script>
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-XTE70X7LT6"></script>
   <script>
@@ -75,7 +75,6 @@
         <!-- Adsterra Bannner Ad -->
       </center>
       <div id="matches-container">
-        <!-- [CLS FIX] NEW SKELETON LOADER with placeholders for section headers -->
         <div id="skeleton-loader">
           <div class="date-section">
             <h2 class="section-header is-loading">&nbsp;</h2>
@@ -108,9 +107,14 @@
     <ul class="footer-menu"><li><a href="/">Home</a></li><li><a href="/About/">About</a></li><li><a href="/Terms/">Terms</a></li><li><a href="/Privacy/">Privacy</a></li><li><a href="/Disclaimer/">Disclaimer</a></li><li><a href="/DMCA/">DMCA</a></li><li><a href="/Contact/">Contact Us</a></li></ul>
     <p>© 2025 buffstreams.world. All rights reserved.</p>
   </footer>
-  <div id="sticky-footer-ad">
-    <div class="ad-content"><span class="emoji">📲</span><span class="cta-text">Get App!</span><a href="https://tinyurl.com/BuffstreamsApp" class="download-btn" rel="nofollow" target="_blank">⬇ Download</a></div>
-    <span id="close-ad">&#10060;</span>
+  
+  <!-- [NEW] Sticky Ad Placeholder -->
+  <div id="sticky-ad-placeholder">
+    <div id="sticky-footer-ad">
+      <div class="ad-content"><span class="emoji">📲</span><span class="cta-text">Get App!</span><a href="https://tinyurl.com/BuffstreamsApp" class="download-btn" rel="nofollow" target="_blank">⬇ Download</a></div>
+      <span id="close-ad">&#10060;</span>
+    </div>
   </div>
+
 </body>
 </html>
