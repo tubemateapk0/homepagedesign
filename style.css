@@ -24,13 +24,27 @@ footer p{padding-bottom:30px}
 .disclaimer-box{background:var(--bg-primary);padding:15px 20px;margin-bottom:20px;border:1px solid var(--border-color);border-radius:8px;max-width:900px;margin-left:auto;margin-right:auto;text-align:left}
 .disclaimer-box h3{margin:0 0 8px;font-size:16px;color:var(--accent-secondary);text-transform:uppercase}
 .disclaimer-box p{margin:0;font-size:14px;line-height:1.5;padding-bottom:10px!important}
-#sticky-footer-ad{position:fixed;bottom:0;left:0;width:100%;background:var(--bg-secondary);padding:10px;z-index:9999;color:var(--white);display:flex;justify-content:center;align-items:center;box-shadow:0 -3px 10px rgba(0,0,0,.4)}
-.ad-content{display:flex;align-items:center;gap:8px;justify-content:center}
-.emoji{font-size:24px;animation:1s infinite bounce}
-.cta-text{font-size:16px;font-weight:700}
-.download-btn{background:var(--accent-primary);color:var(--white);padding:8px 20px;border-radius:25px;font-size:16px;font-weight:700;transition:.3s}
-#close-ad{position:absolute;top:3px;right:5px;font-size:14px;padding:5px;border-radius:50%;background:#333;cursor:pointer;margin-right:20px}
-@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+/* [MODIFIED] Sticky Footer Ad Styles */
+#sticky-ad-placeholder {
+  display: none; /* Hidden by default */
+  height: 44px; /* Approximate height of the ad */
+}
+
+#sticky-footer-ad{position:fixed;bottom:0;left:0;width:100%;background:#161b22;padding:10px;z-index:9999;font-family:Arial,sans-serif;color:#fff;display:flex;justify-content:center;align-items:center;box-shadow:0 -3px 10px rgba(0,0,0,.4);overflow:hidden}.ad-content{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;justify-content:center;padding:0 20px}.emoji{font-size:24px;animation:1s infinite bounce}.cta-text{font-size:16px;font-weight:700;animation:2s infinite pulseText;white-space:nowrap;text-overflow:ellipsis}.download-btn{background:#111;color:#fff;padding:8px 20px;border-radius:25px;font-size:16px;font-weight:700;text-decoration:none;transition:.3s;animation:1.5s infinite alternate buttonPulse}.download-btn:hover{background:#fff;color:#111;transform:scale(1.1)}#close-ad{position:absolute;top:3px;right:5px;font-size:14px;padding:5px;border-radius:50%;background:#333;color:#fff;cursor:pointer;box-shadow:0 0 5px rgba(0,0,0,.5);transition:.3s;}#close-ad:hover,.badge.finished{background:red}
+
+/* [NEW] Show sticky ad only on mobile */
+@media (max-width: 768px) {
+  #sticky-ad-placeholder.is-mobile {
+    display: block; /* Show placeholder on mobile */
+  }
+  footer p {
+    padding-bottom: 60px; /* Add padding to footer to not be covered by ad */
+  }
+}
+
+@media (max-width: 480px) {
+  #sticky-footer-ad .ad-content {padding: 0 10px;}
+}
 
 /* ========================================================================= */
 /* ===  2. HOMEPAGE SPECIFIC STYLES  ======================================= */
@@ -165,4 +179,5 @@ footer p{padding-bottom:30px}
 @media(max-width:600px){.search-and-schedule-container{flex-direction:column;align-items:stretch}}
 @media(max-width:500px){.search-overlay-content{width:100%;max-width:none}.search-results-container .match-card{width:calc(50% - .5rem)}}
 @media(max-width:480px){.nav-menu li a{padding: 6px 6px;}.categories-grid{grid-template-columns:1fr 1fr;gap:1rem}.category-card img{max-width:70px;height:70px}.category-card span{font-size:0.8rem}
+
 .category-card .live-badge{top:8px;right:8px;font-size:0.7rem;padding:3px 8px;}}
