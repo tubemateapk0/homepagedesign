@@ -13,7 +13,14 @@ main{display:block}
 header{padding:8px 20px;display:flex;justify-content:center}
 .main-header{background:rgba(13,17,23,0.8);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:10px 20px;display:flex;justify-content:center;transition:background-color .3s ease}
 .main-header.sticky{position:fixed;top:0;width:100%;z-index:1000;box-shadow:0 4px 6px rgba(0,0,0,.5);transform:translateY(-100%);animation:slide-down .4s ease-out forwards}
+/* [ADD THIS RULE] This is the fix for the vanishing/breaking issue */
+.main-header.sticky,
+#sticky-footer-ad {
+  will-change: transform;
+}
+
 @keyframes slide-down{100%{transform:translateY(0)}}
+
 .nav-menu{list-style:none;display:flex;gap:10px;flex-wrap:nowrap;margin:0;padding:5px 8px;justify-content:center;align-items:center}
 .nav-menu li.menu-item{flex-shrink:1}
 .nav-menu li a{color:#ade8f4;text-decoration:none;font-weight:500;padding:6px 12px;border-radius:6px;transition:.3s}
@@ -185,5 +192,6 @@ footer p{padding-bottom:30px}
 @media(max-width:480px){.nav-menu li a{padding: 6px 6px;}.categories-grid{grid-template-columns:1fr 1fr;gap:1rem}.category-card img{max-width:70px;height:70px}.category-card span{font-size:0.8rem}
 
 .category-card .live-badge{top:8px;right:8px;font-size:0.7rem;padding:3px 8px;}}
+
 
 
