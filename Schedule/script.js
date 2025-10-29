@@ -1,8 +1,9 @@
 // =================================================================================
-// CATEGORY PAGE SCRIPT - v6.0 (WITH LIVE VIEWER SORTING)
+// CATEGORY PAGE SCRIPT - v7.0 (Optimized with Two-Phase Loading)
 // =================================================================================
 
 (function() {
+  "use strict";
   // Global caches
   let allMatchesForSearch = [];
   let categoryMatchesCache = [];
@@ -37,7 +38,6 @@
   // === HELPER & RENDERING FUNCTIONS ===
   // =========================================================================
 
-  // [NEW] Viewer count formatting function from homepage
   const formatViewers = (num) => {
     if (num >= 1000) {
         return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
@@ -71,13 +71,19 @@
     return placeholder;
   }
 
-  // [UPDATED] createMatchCard now handles viewer badges
   function createMatchCard(match, options = {}) {
     if (!match || !match.id) return document.createDocumentFragment();
     const lazyLoad = options.lazyLoad !== false;
     const card = document.createElement("a");
     card.href = `../Matchinformation/?id=${match.id}`;
     card.classList.add("match-card");
+    
+    // [OPTIMIZATION] Add data attributes for easier DOM manipulation later
+    card.dataset.matchId = match.id;
+    card.dataset.date = match.date;
+    if (match.viewers > 0) {
+        card.dataset.viewers = match.viewers;
+    }
     
     const poster = document.createElement("img");
     poster.classList.add("match-poster");
@@ -95,8 +101,10 @@
     const { badge, badgeType, meta } = formatDateTime(match.date);
     const statusBadge = document.createElement("div");
     statusBadge.classList.add("status-badge", badgeType);
+    
+    // [OPTIMIZATION] Add a data attribute to the badge for easy selection
+    statusBadge.dataset.badgeContainer = "true";
 
-    // --- Viewer Badge Logic ---
     if (match.viewers > 0) {
       statusBadge.classList.add("viewer-badge", "live");
       const eyeIconSVG = `<svg class="viewer-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"></path></svg>`;
@@ -156,237 +164,307 @@
     }
   }
 
-  // =========================================================================
-  // === FILTERING & DATE GROUPING LOGIC ===
-  // =========================================================================
-// =========================================================================
-// === REPLACE THE EXISTING renderMatches FUNCTION WITH THIS NEW VERSION ===
-// =========================================================================
-function renderMatches() {
-  let matchesToRender = [...categoryMatchesCache];
-  // --- Apply active filters ---
-  if (currentFilters.live) {
-    matchesToRender = matchesToRender.filter(match => match.date <= Date.now());
-  }
-  if (currentFilters.source !== 'all') {
-    matchesToRender = matchesToRender.filter(match => 
-      match.sources && match.sources.some(s => s.source.toLowerCase() === currentFilters.source)
-    );
-  }
-  if (currentFilters.popular) {
-    matchesToRender = matchesToRender.filter(match => match.popular === true);
-  }
-
-  // --- Clear previous content and check if there are any matches ---
-  matchesContainer.innerHTML = ""; // This will clear the skeleton loader
-  messageContainer.style.display = 'none';
-
-  if (matchesToRender.length === 0) {
-    messageContainer.textContent = "No matches found with the selected filters.";
-    messageContainer.style.display = 'block';
-    return;
-  }
-
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-  // --- NEW LOGIC: Separate matches into three distinct groups ---
-  
-  // 1. Any match with viewers, regardless of its date.
-  const liveWithViewers = matchesToRender.filter(m => m.viewers > 0);
-  
-  // 2. Upcoming/Today's matches that DO NOT have viewers.
-  const upcomingOrToday = matchesToRender.filter(m => m.date >= todayStart.getTime() && !(m.viewers > 0));
-  
-  // 3. 24/7 matches that DO NOT have viewers.
-  const old247 = matchesToRender.filter(m => m.date < todayStart.getTime() && !(m.viewers > 0));
-
-  // --- Sort each group independently ---
-  liveWithViewers.sort((a, b) => (b.viewers || 0) - (a.viewers || 0));
-  upcomingOrToday.sort((a, b) => a.date - b.date);
-  old247.sort((a, b) => b.date - a.date); // Most recent first
-
-  // Group upcoming matches by date for section creation
-  const groupedUpcoming = upcomingOrToday.reduce((acc, match) => {
-    const matchDate = new Date(match.date);
-    const dateKey = new Date(matchDate.getFullYear(), matchDate.getMonth(), matchDate.getDate()).toISOString();
-    if (!acc[dateKey]) acc[dateKey] = [];
-    acc[dateKey].push(match);
-    return acc;
-  }, {});
-
-  const fragment = document.createDocumentFragment();
-  const todayKey = todayStart.toISOString();
-
-  // --- RENDER TODAY SECTION ---
-  // This section will contain matches with viewers AND other matches scheduled for today.
-  const todayMatchesExist = liveWithViewers.length > 0 || groupedUpcoming[todayKey];
-  if (todayMatchesExist) {
-    const section = document.createElement('div');
-    section.className = 'date-section';
-    const dateLabel = now.toLocaleDateString([], { day: 'numeric', month: 'short' }).toUpperCase();
-    section.innerHTML = `<h2 class="section-header">TODAY <span class="date-day">${dateLabel}</span></h2>`;
-    const grid = document.createElement('div');
-    grid.className = 'results-grid';
-    
-    // Add matches with viewers first
-    liveWithViewers.forEach(match => grid.appendChild(createMatchCard(match)));
-    
-    // Add other matches for today
-    if (groupedUpcoming[todayKey]) {
-      groupedUpcoming[todayKey].forEach(match => grid.appendChild(createMatchCard(match)));
-    }
-    
-    section.appendChild(grid);
-    fragment.appendChild(section);
-  }
-
-  // --- RENDER FUTURE DATE SECTIONS ---
-  Object.keys(groupedUpcoming).sort().forEach(dateKey => {
-    if (dateKey === todayKey) return; // Skip today, it's already rendered
-    const date = new Date(dateKey);
-    const dayLabel = date.toLocaleDateString([], { weekday: 'short' }).toUpperCase();
-    const dateLabel = date.toLocaleDateString([], { day: 'numeric', month: 'short' }).toUpperCase();
-    const section = document.createElement('div');
-    section.className = 'date-section';
-    section.innerHTML = `<h2 class="section-header">${dayLabel} <span class="date-day">${dateLabel}</span></h2>`;
-    const grid = document.createElement('div');
-    grid.className = 'results-grid';
-    groupedUpcoming[dateKey].forEach(match => grid.appendChild(createMatchCard(match)));
-    section.appendChild(grid);
-    fragment.appendChild(section);
-  });
-  
-  // --- RENDER 24/7 SECTION (only matches without viewers) ---
-  if (old247.length > 0) {
-    const section = document.createElement('div');
-    section.className = 'date-section';
-    section.innerHTML = `<h2 class="section-header">24/7 FREE</h2>`;
-    const grid = document.createElement('div');
-    grid.className = 'results-grid';
-    old247.forEach(match => grid.appendChild(createMatchCard(match)));
-    section.appendChild(grid);
-    fragment.appendChild(section);
-  }
-
-  matchesContainer.appendChild(fragment);
-  updateActiveFiltersUI();
-  initiateDelayedImageLoading();
-}
-  // =========================================================================
-  // === URL & UI STATE MANAGEMENT ===
-  // =========================================================================
-  function updateUrlWithFilters(){const params=new URLSearchParams;currentFilters.live&&params.set("live","true"),currentFilters.popular&&params.set("popular","true"),"all"!==currentFilters.source&&params.set("source",currentFilters.source);const queryString=params.toString(),newUrl=`${window.location.pathname}${queryString?`?${queryString}`:""}${window.location.hash}`;history.replaceState(null,"",newUrl)}
-  
-  function updateActiveFiltersUI(){activeFiltersContainer.innerHTML="";const createTag=(key,text)=>{const tag=document.createElement("div");tag.className="active-filter-tag",tag.dataset.filterKey=key,tag.innerHTML=`<span>${text}</span><button class="remove-filter-btn" data-filter-key="${key}">&times;</button>`,activeFiltersContainer.appendChild(tag)};currentFilters.live&&createTag("live","Live"),currentFilters.popular&&createTag("popular","Popular"),"all"!==currentFilters.source&&createTag("source",`${currentFilters.source}`)}
-
-  // =========================================================================
-  // === EVENT LISTENERS & ROUTING ===
-  // =========================================================================
-  function setupEventListeners(){filterToggleBtn.addEventListener("click",()=>filterBar.classList.toggle("is-expanded")),filterOptions.addEventListener("click",e=>{const target=e.target.closest(".filter-btn");if(target){const filterKey=target.dataset.filter;currentFilters[filterKey]=!currentFilters[filterKey],target.classList.toggle("active",currentFilters[filterKey]),updateUrlWithFilters(),renderMatches()}}),sourceSelect.addEventListener("change",()=>{currentFilters.source=sourceSelect.value,updateUrlWithFilters(),renderMatches()}),
-  
-  categorySelect.addEventListener('change', () => {
-    const newCategory = categorySelect.value;
-    window.location.hash = `/${newCategory.charAt(0).toUpperCase() + newCategory.slice(1)}`;
-  }),
-  
-  activeFiltersContainer.addEventListener("click",e=>{const target=e.target.closest(".remove-filter-btn");if(target){const key=target.dataset.filterKey;"boolean"==typeof currentFilters[key]?(currentFilters[key]=!1,document.querySelector(`.filter-btn[data-filter="${key}"]`)?.classList.remove("active")):(currentFilters[key]="all",sourceSelect.value="all"),updateUrlWithFilters(),renderMatches()}})}
-  
-  function populateFilterDropdowns(currentCategory){
-    categorySelect.innerHTML = CATEGORIES.map(cat => {
-      const isSelected = cat === currentCategory ? 'selected' : '';
-      const displayText = cat === 'all' 
-        ? 'All Sports' 
-        : cat.replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase());
-      return `<option value="${cat}" ${isSelected}>${displayText}</option>`;
-    }).join('');
-
-    sourceSelect.innerHTML='<option value="all">All Sources</option>',SOURCES.forEach(source=>{const capitalizedSource=source.charAt(0).toUpperCase()+source.slice(1);sourceSelect.innerHTML+=`<option value="${source}">${capitalizedSource}</option>`}),sourceSelect.value=currentFilters.source
-  }
-  
-  // [UPDATED] handleRouteChange now fetches viewer data before rendering
-  async function handleRouteChange() {
-    let categoryName = window.location.hash.substring(2).toLowerCase() || "all";
-    if (!CATEGORIES.includes(categoryName)) categoryName = "all";
-    
-    const urlParams = new URLSearchParams(window.location.search);
-    currentFilters.live = urlParams.get('live') === 'true';
-    currentFilters.popular = urlParams.get('popular') === 'true';
-    currentFilters.source = urlParams.get('source') || 'all';
-
-    const isAllSports = categoryName === 'all';
-    const formattedName = isAllSports ? 'All Sports' : categoryName.replace(/-/g, ' ');
-    const pageTitleText = `buffstreams.world ${formattedName.replace(/\b\w/g, l => l.toUpperCase())} Matches`;
-    
-    pageTitle.textContent = pageTitleText;
-    titleElement.textContent = pageTitleText;
-    matchesContainer.innerHTML = "";
-    skeletonLoader.style.display = "grid";
-    messageContainer.style.display = "none";
-    document.querySelector('.filter-btn[data-filter="live"]').classList.toggle('active', currentFilters.live);
-    document.querySelector('.filter-btn[data-filter="popular"]').classList.toggle('active', currentFilters.popular);
-    updateActiveFiltersUI();
-
-    try {
-      const apiUrl = isAllSports ? `${API_BASE}/matches/all` : `${API_BASE}/matches/${categoryName}`;
-      const response = await fetch(apiUrl);
-      if (!response.ok) throw new Error(`API error: ${response.status}`);
-      categoryMatchesCache = await response.json();
-      
-      if (!categoryMatchesCache || categoryMatchesCache.length === 0) {
-        skeletonLoader.style.display = 'none';
-        messageContainer.textContent = `No matches found for ${formattedName}. Check back later!`;
-        messageContainer.style.display = "block";
-        return;
+  function renderMatches() {
+      let matchesToRender = [...categoryMatchesCache];
+      if (currentFilters.live) {
+          matchesToRender = matchesToRender.filter(match => match.date <= Date.now());
       }
-      
-      // --- Fetch viewer counts for live matches before rendering ---
-      const liveMatches = categoryMatchesCache.filter(match => match.date <= Date.now());
-      if (liveMatches.length > 0) {
-        const streamFetchPromises = liveMatches.flatMap(match =>
+      if (currentFilters.source !== 'all') {
+          matchesToRender = matchesToRender.filter(match =>
+              match.sources && match.sources.some(s => s.source.toLowerCase() === currentFilters.source)
+          );
+      }
+      if (currentFilters.popular) {
+          matchesToRender = matchesToRender.filter(match => match.popular === true);
+      }
+      matchesContainer.innerHTML = "";
+      messageContainer.style.display = 'none';
+
+      if (matchesToRender.length === 0) {
+          messageContainer.textContent = "No matches found with the selected filters.";
+          messageContainer.style.display = 'block';
+          return;
+      }
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const liveWithViewers = matchesToRender.filter(m => m.viewers > 0);
+      const upcomingOrToday = matchesToRender.filter(m => m.date >= todayStart.getTime() && !(m.viewers > 0));
+      const old247 = matchesToRender.filter(m => m.date < todayStart.getTime() && !(m.viewers > 0));
+
+      liveWithViewers.sort((a, b) => (b.viewers || 0) - (a.viewers || 0));
+      upcomingOrToday.sort((a, b) => a.date - b.date);
+      old247.sort((a, b) => b.date - a.date);
+
+      const groupedUpcoming = upcomingOrToday.reduce((acc, match) => {
+          const matchDate = new Date(match.date);
+          const dateKey = new Date(matchDate.getFullYear(), matchDate.getMonth(), matchDate.getDate()).toISOString();
+          if (!acc[dateKey]) acc[dateKey] = [];
+          acc[dateKey].push(match);
+          return acc;
+      }, {});
+      const fragment = document.createDocumentFragment();
+      const todayKey = todayStart.toISOString();
+      const todayMatchesExist = liveWithViewers.length > 0 || groupedUpcoming[todayKey];
+      if (todayMatchesExist) {
+          const section = document.createElement('div');
+          section.className = 'date-section';
+          const dateLabel = now.toLocaleDateString([], { day: 'numeric', month: 'short' }).toUpperCase();
+          section.innerHTML = `<h2 class="section-header">TODAY <span class="date-day">${dateLabel}</span></h2>`;
+          const grid = document.createElement('div');
+          grid.className = 'results-grid';
+          grid.id = 'today-matches-grid'; // [OPTIMIZATION] Add ID for easy selection
+          liveWithViewers.forEach(match => grid.appendChild(createMatchCard(match)));
+          if (groupedUpcoming[todayKey]) {
+              groupedUpcoming[todayKey].forEach(match => grid.appendChild(createMatchCard(match)));
+          }
+          section.appendChild(grid);
+          fragment.appendChild(section);
+      }
+      Object.keys(groupedUpcoming).sort().forEach(dateKey => {
+          if (dateKey === todayKey) return;
+          const date = new Date(dateKey);
+          const dayLabel = date.toLocaleDateString([], { weekday: 'short' }).toUpperCase();
+          const dateLabel = date.toLocaleDateString([], { day: 'numeric', month: 'short' }).toUpperCase();
+          const section = document.createElement('div');
+          section.className = 'date-section';
+          section.innerHTML = `<h2 class="section-header">${dayLabel} <span class="date-day">${dateLabel}</span></h2>`;
+          const grid = document.createElement('div');
+          grid.className = 'results-grid';
+          groupedUpcoming[dateKey].forEach(match => grid.appendChild(createMatchCard(match)));
+          section.appendChild(grid);
+          fragment.appendChild(section);
+      });
+      if (old247.length > 0) {
+          const section = document.createElement('div');
+          section.className = 'date-section';
+          section.innerHTML = `<h2 class="section-header">24/7 FREE</h2>`;
+          const grid = document.createElement('div');
+          grid.className = 'results-grid';
+          old247.forEach(match => grid.appendChild(createMatchCard(match)));
+          section.appendChild(grid);
+          fragment.appendChild(section);
+      }
+      matchesContainer.appendChild(fragment);
+      updateActiveFiltersUI();
+      initiateDelayedImageLoading();
+  }
+  
+  function updateUrlWithFilters() {
+      const params = new URLSearchParams;
+      currentFilters.live && params.set("live", "true"), currentFilters.popular && params.set("popular", "true"), "all" !== currentFilters.source && params.set("source", currentFilters.source);
+      const queryString = params.toString(),
+          newUrl = `${window.location.pathname}${queryString ? `?${queryString}` : ""}${window.location.hash}`;
+      history.replaceState(null, "", newUrl)
+  }
+
+  function updateActiveFiltersUI() {
+      activeFiltersContainer.innerHTML = "";
+      const createTag = (key, text) => {
+          const tag = document.createElement("div");
+          tag.className = "active-filter-tag", tag.dataset.filterKey = key, tag.innerHTML = `<span>${text}</span><button class="remove-filter-btn" data-filter-key="${key}">&times;</button>`, activeFiltersContainer.appendChild(tag)
+      };
+      currentFilters.live && createTag("live", "Live"), currentFilters.popular && createTag("popular", "Popular"), "all" !== currentFilters.source && createTag("source", `${currentFilters.source}`)
+  }
+
+  function setupEventListeners() {
+      filterToggleBtn.addEventListener("click", () => filterBar.classList.toggle("is-expanded")), filterOptions.addEventListener("click", e => {
+          const target = e.target.closest(".filter-btn");
+          if (target) {
+              const filterKey = target.dataset.filter;
+              currentFilters[filterKey] = !currentFilters[filterKey], target.classList.toggle("active", currentFilters[filterKey]), updateUrlWithFilters(), renderMatches()
+          }
+      }), sourceSelect.addEventListener("change", () => {
+          currentFilters.source = sourceSelect.value, updateUrlWithFilters(), renderMatches()
+      }), categorySelect.addEventListener('change', () => {
+          const newCategory = categorySelect.value;
+          window.location.hash = `/${newCategory.charAt(0).toUpperCase() + newCategory.slice(1)}`;
+      }), activeFiltersContainer.addEventListener("click", e => {
+          const target = e.target.closest(".remove-filter-btn");
+          if (target) {
+              const key = target.dataset.filterKey;
+              "boolean" == typeof currentFilters[key] ? (currentFilters[key] = !1, document.querySelector(`.filter-btn[data-filter="${key}"]`)?.classList.remove("active")) : (currentFilters[key] = "all", sourceSelect.value = "all"), updateUrlWithFilters(), renderMatches()
+          }
+      })
+  }
+
+  function populateFilterDropdowns(currentCategory) {
+      categorySelect.innerHTML = CATEGORIES.map(cat => {
+          const isSelected = cat === currentCategory ? 'selected' : '';
+          const displayText = cat === 'all' ?
+              'All Sports' :
+              cat.replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+          return `<option value="${cat}" ${isSelected}>${displayText}</option>`;
+      }).join('');
+      sourceSelect.innerHTML = '<option value="all">All Sources</option>', SOURCES.forEach(source => {
+          const capitalizedSource = source.charAt(0).toUpperCase() + source.slice(1);
+          sourceSelect.innerHTML += `<option value="${source}">${capitalizedSource}</option>`
+      }), sourceSelect.value = currentFilters.source
+  }
+
+  // [NEW] Fetches viewers and updates the DOM in the background
+  async function fetchAndUpdateViewers() {
+      const liveMatches = categoryMatchesCache.filter(match => match.date <= Date.now() && match.sources?.length > 0);
+      if (liveMatches.length === 0) return;
+
+      const streamFetchPromises = liveMatches.flatMap(match =>
           match.sources.map(source =>
-            fetch(`${API_BASE}/stream/${source.source}/${source.id}`)
+              fetch(`${API_BASE}/stream/${source.source}/${source.id}`)
               .then(res => res.ok ? res.json() : [])
               .then(streams => ({ matchId: match.id, streams }))
+              .catch(() => ({ matchId: match.id, streams: [] })) // Handle fetch errors gracefully
           )
-        );
-        const results = await Promise.allSettled(streamFetchPromises);
-        const viewerCounts = {};
-        results.forEach(result => {
-          if (result.status === 'fulfilled' && result.value) {
-            const { matchId, streams } = result.value;
-            if (!viewerCounts[matchId]) viewerCounts[matchId] = 0;
-            streams.forEach(stream => {
-              if (stream.viewers && typeof stream.viewers === 'number') {
-                viewerCounts[matchId] += stream.viewers;
-              }
-            });
-          }
-        });
-        categoryMatchesCache.forEach(match => {
-          if (viewerCounts[match.id]) {
-            match.viewers = viewerCounts[match.id];
-          }
-        });
-      }
-      
-      skeletonLoader.style.display = 'none';
-      populateFilterDropdowns(categoryName);
-      renderMatches();
+      );
 
-    } catch (error) {
-      console.error("Failed to load category matches:", error);
-      skeletonLoader.style.display = 'none';
-      messageContainer.textContent = "Could not load matches. Please check your connection and try again.",
-      messageContainer.style.display = "block";
-    }
+      const results = await Promise.allSettled(streamFetchPromises);
+      const viewerCounts = {};
+      results.forEach(result => {
+          if (result.status === 'fulfilled' && result.value) {
+              const { matchId, streams } = result.value;
+              if (!viewerCounts[matchId]) viewerCounts[matchId] = 0;
+              streams.forEach(stream => {
+                  if (stream.viewers && typeof stream.viewers === 'number') {
+                      viewerCounts[matchId] += stream.viewers;
+                  }
+              });
+          }
+      });
+
+      // Update the DOM and cache with new viewer counts
+      Object.keys(viewerCounts).forEach(matchId => {
+          const totalViewers = viewerCounts[matchId];
+          if (totalViewers > 0) {
+              const matchInCache = categoryMatchesCache.find(m => m.id == matchId);
+              if (matchInCache) {
+                  matchInCache.viewers = totalViewers; // Update cache
+              }
+
+              const cardInDOM = document.querySelector(`.match-card[data-match-id="${matchId}"]`);
+              if (cardInDOM) {
+                  cardInDOM.dataset.viewers = totalViewers; // Update DOM attribute
+                  const badge = cardInDOM.querySelector('[data-badge-container]');
+                  if (badge) {
+                      badge.classList.add("viewer-badge", "live");
+                      const eyeIconSVG = `<svg class="viewer-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"></path></svg>`;
+                      badge.innerHTML = `<span>${formatViewers(totalViewers)}</span>${eyeIconSVG}`;
+                  }
+              }
+          }
+      });
+      
+      // [NEW] After updating viewers, re-sort the live grid in the DOM
+      sortTodayGridByViewers();
   }
 
-  // =========================================================================
-  // === SEARCH FUNCTIONALITY ===
-  // =========================================================================
-  async function fetchAllMatchesForSearch(){try{const res=await fetch(`${API_BASE}/matches/all`);if(!res.ok)throw new Error("Failed to fetch search data");const allMatches=await res.json();const map=new Map;allMatches.forEach(m=>map.set(m.id,m)),allMatchesForSearch=Array.from(map.values())}catch(err){console.error("Error fetching search data:",err)}}
-  function setupSearch(){const searchInput=document.getElementById("search-input"),searchOverlay=document.getElementById("search-overlay"),overlayInput=document.getElementById("overlay-search-input"),overlayResults=document.getElementById("overlay-search-results"),searchClose=document.getElementById("search-close");if(searchInput){searchInput.addEventListener("focus",()=>{searchOverlay.style.display="flex",overlayInput.value=searchInput.value,overlayInput.focus(),overlayResults.innerHTML=""}),searchClose.addEventListener("click",()=>{searchOverlay.style.display="none"}),searchOverlay.addEventListener("click",e=>{e.target.closest(".search-overlay-content")||(searchOverlay.style.display="none")}),overlayInput.addEventListener("input",function(){const q=this.value.trim().toLowerCase();if(overlayResults.innerHTML="",!q)return;const filtered=allMatchesForSearch.filter(m=>(m.title||"").toLowerCase().includes(q)||(m.league||"").toLowerCase().includes(q)||(m.teams?.home?.name||"").toLowerCase().includes(q)||(m.teams?.away?.name||"").toLowerCase().includes(q));filtered.slice(0,12).forEach(match=>{const item=document.createElement("div");item.className="search-result-item",item.appendChild(createMatchCard(match,{lazyLoad:!1})),overlayResults.appendChild(item)})}),overlayInput.addEventListener("keydown",e=>{if("Enter"===e.key){const q=overlayInput.value.trim();q&&(window.location.href=`../SearchResult/?q=${encodeURIComponent(q)}`)}})}}
+  // [NEW] Sorts the "Today" grid directly in the DOM without a full re-render
+  function sortTodayGridByViewers() {
+      const todayGrid = document.getElementById('today-matches-grid');
+      if (!todayGrid) return;
+
+      const cards = Array.from(todayGrid.querySelectorAll('.match-card'));
+      const liveCards = cards.filter(card => card.dataset.date <= Date.now());
+
+      liveCards.sort((a, b) => {
+          const viewersA = parseInt(a.dataset.viewers) || 0;
+          const viewersB = parseInt(b.dataset.viewers) || 0;
+          return viewersB - viewersA;
+      });
+      
+      // Prepend sorted live cards to the beginning of the grid
+      liveCards.forEach(card => todayGrid.prepend(card));
+  }
+
+  async function handleRouteChange() {
+      let categoryName = window.location.hash.substring(2).toLowerCase() || "all";
+      if (!CATEGORIES.includes(categoryName)) categoryName = "all";
+      const urlParams = new URLSearchParams(window.location.search);
+      currentFilters.live = urlParams.get('live') === 'true';
+      currentFilters.popular = urlParams.get('popular') === 'true';
+      currentFilters.source = urlParams.get('source') || 'all';
+      const isAllSports = categoryName === 'all';
+      const formattedName = isAllSports ? 'All Sports' : categoryName.replace(/-/g, ' ');
+      const pageTitleText = `buffstreams.world ${formattedName.replace(/\b\w/g, l => l.toUpperCase())} Matches`;
+      pageTitle.textContent = pageTitleText;
+      titleElement.textContent = pageTitleText;
+      matchesContainer.innerHTML = "";
+      skeletonLoader.style.display = "grid";
+      messageContainer.style.display = "none";
+      document.querySelector('.filter-btn[data-filter="live"]').classList.toggle('active', currentFilters.live);
+      document.querySelector('.filter-btn[data-filter="popular"]').classList.toggle('active', currentFilters.popular);
+      updateActiveFiltersUI();
+
+      try {
+          const apiUrl = isAllSports ? `${API_BASE}/matches/all` : `${API_BASE}/matches/${categoryName}`;
+          const response = await fetch(apiUrl);
+          if (!response.ok) throw new Error(`API error: ${response.status}`);
+          categoryMatchesCache = await response.json();
+          skeletonLoader.style.display = 'none';
+
+          if (!categoryMatchesCache || categoryMatchesCache.length === 0) {
+              messageContainer.textContent = `No matches found for ${formattedName}. Check back later!`;
+              messageContainer.style.display = "block";
+              return;
+          }
+          
+          // --- [OPTIMIZATION] ---
+          // Phase 1: Render the page immediately with the data we have.
+          populateFilterDropdowns(categoryName);
+          renderMatches();
+
+          // Phase 2: Start fetching viewer counts in the background.
+          // This does not block the user from interacting with the page.
+          fetchAndUpdateViewers();
+
+      } catch (error) {
+          console.error("Failed to load category matches:", error);
+          skeletonLoader.style.display = 'none';
+          messageContainer.textContent = "Could not load matches. Please check your connection and try again.",
+          messageContainer.style.display = "block";
+      }
+  }
+
+  async function fetchAllMatchesForSearch() {
+      try {
+          const res = await fetch(`${API_BASE}/matches/all`);
+          if (!res.ok) throw new Error("Failed to fetch search data");
+          const allMatches = await res.json();
+          const map = new Map;
+          allMatches.forEach(m => map.set(m.id, m)), allMatchesForSearch = Array.from(map.values())
+      } catch (err) {
+          console.error("Error fetching search data:", err)
+      }
+  }
+
+  function setupSearch() {
+      const searchInput = document.getElementById("search-input"),
+          searchOverlay = document.getElementById("search-overlay"),
+          overlayInput = document.getElementById("overlay-search-input"),
+          overlayResults = document.getElementById("overlay-search-results"),
+          searchClose = document.getElementById("search-close");
+      if (searchInput) {
+          searchInput.addEventListener("focus", () => {
+              searchOverlay.style.display = "flex", overlayInput.value = searchInput.value, overlayInput.focus(), overlayResults.innerHTML = ""
+          }), searchClose.addEventListener("click", () => {
+              searchOverlay.style.display = "none"
+          }), searchOverlay.addEventListener("click", e => {
+              e.target.closest(".search-overlay-content") || (searchOverlay.style.display = "none")
+          }), overlayInput.addEventListener("input", function() {
+              const q = this.value.trim().toLowerCase();
+              if (overlayResults.innerHTML = "", !q) return;
+              const filtered = allMatchesForSearch.filter(m => (m.title || "").toLowerCase().includes(q) || (m.league || "").toLowerCase().includes(q) || (m.teams?.home?.name || "").toLowerCase().includes(q) || (m.teams?.away?.name || "").toLowerCase().includes(q));
+              filtered.slice(0, 12).forEach(match => {
+                  const item = document.createElement("div");
+                  item.className = "search-result-item", item.appendChild(createMatchCard(match, {
+                      lazyLoad: !1
+                  })), overlayResults.appendChild(item)
+              })
+          }), overlayInput.addEventListener("keydown", e => {
+              if ("Enter" === e.key) {
+                  const q = overlayInput.value.trim();
+                  q && (window.location.href = `../SearchResult/?q=${encodeURIComponent(q)}`)
+              }
+          })
+      }
+  }
 
   // === START THE APP ===
   setupEventListeners();
