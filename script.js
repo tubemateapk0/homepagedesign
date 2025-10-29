@@ -78,15 +78,7 @@ window.addEventListener('load', function() {
             });
     })();
     
-    // --- 5. LAZY-LOAD MOBILE AD SCRIPT ---
-    (function lazyLoadMobileAdScript() {
-        setTimeout(() => {
-            const script = document.createElement('script');
-            script.src = 'https://tubemateapk0.github.io/homepagedesign/mobiledetectscript.js';
-            script.defer = true;
-            document.body.appendChild(script);
-        }, 2500);
-    })();
+    
 
     // =========================================================================
     // === [NEW] DYNAMIC CATEGORY SORTING LOGIC ===
@@ -232,4 +224,5 @@ window.addEventListener('load', function() {
     })();
 
 });
+
 
