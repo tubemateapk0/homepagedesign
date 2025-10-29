@@ -82,7 +82,7 @@ window.addEventListener('load', function() {
     (function lazyLoadMobileAdScript() {
         setTimeout(() => {
             const script = document.createElement('script');
-            script.src = '/mobiledetectscript.js';
+            script.src = './mobiledetectscript.js';
             script.defer = true;
             document.body.appendChild(script);
         }, 2500);
@@ -230,4 +230,5 @@ window.addEventListener('load', function() {
         updateHomepageCategories();
     
     })();
+
 });
