@@ -1,5 +1,11 @@
 User-agent: *
+
+Disallow: /SearchResult/
+Disallow: /Matchinformation/
+Disallow: /Watch/
+
+# Explicitly allow all other content.
 Allow: /
 
-
 Sitemap: https://buffstreams.world/sitemap.xml
+
