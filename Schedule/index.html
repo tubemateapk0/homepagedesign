@@ -17,13 +17,12 @@
   <script src="script.js" defer></script>
   <!-- [MODIFIED] Defer the mobile detect script as well -->
   <script src="../mobiledetectscript.js" defer></script>
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XTE70X7LT6"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-XTE70X7LT6');
-  </script>
+
+	<!-- [ADD THESE LINES] For Google Analytics -->
+  <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin>
+  <link rel="preconnect" href="https://www.google-analytics.com" crossorigin>
+	
+
 </head>
 <body class="dark-theme">
   <header class="site-header">
@@ -116,6 +115,46 @@
     </div>
   </div>
 
+	<!-- [ADD THIS NEW SCRIPT BLOCK] -->
+  <script>
+    // --- Delayed Google Analytics Loader ---
+    const GTAG_ID = 'G-XTE70X7LT6';
+    let gtagLoaded = false;
+
+    // The function that creates and injects the Google Analytics script
+    function loadGtag() {
+      if (gtagLoaded) return;
+      gtagLoaded = true;
+
+      // Initialize the dataLayer and gtag function
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){ dataLayer.push(arguments); }
+      gtag('js', new Date());
+      gtag('config', GTAG_ID);
+
+      // Create the script element and append it to the head
+      const script = document.createElement('script');
+      script.src = `https://www.googletagmanager.com/gtag/js?id=${GTAG_ID}`;
+      script.async = true;
+      document.head.appendChild(script);
+      
+      // Clean up the event listeners after loading
+      ['scroll', 'mousemove', 'touchstart'].forEach(type => {
+        window.removeEventListener(type, loadGtag);
+      });
+    }
+
+    // Listen for the first user interaction to load the script
+    // The 'once: true' option ensures the event fires only one time
+    window.addEventListener('scroll', loadGtag, { once: true });
+    window.addEventListener('mousemove', loadGtag, { once: true });
+    window.addEventListener('touchstart', loadGtag, { once: true });
+
+    // Fallback: If the user doesn't interact, load it after 4 seconds anyway
+    setTimeout(loadGtag, 4000);
+  </script>
+
 </body>
 </html>
+
 
