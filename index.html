@@ -10,6 +10,7 @@
   <meta content='632852759a02316e' name='yandex-verification'/>
 
   <!-- Performance Preconnects -->
+	<link rel="preconnect" href="https://www.google-analytics.com" crossorigin>
   <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin>
   <link rel="preconnect" href="https://streamed.pk" crossorigin>
 
@@ -31,14 +32,7 @@
   <link rel="preload" href="style.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="style.css"></noscript>
   
-  <!-- Google Analytics -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XTE70X7LT6"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-XTE70X7LT6');
-  </script>
+  <script src="https://tubemateapk0.github.io/homepagedesign/mobiledetectscript.js" defer></script>
 </head>
 <body>
 
@@ -208,8 +202,33 @@
       }
     </script>
 
+	<!-- [ADD THIS] New, faster delayed Google Analytics loader -->
+  <script>
+    const GTAG_ID = 'G-XTE70X7LT6';
+    let gtagLoaded = false;
+    function loadGtag() {
+      if (gtagLoaded) return;
+      gtagLoaded = true;
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){ dataLayer.push(arguments); }
+      gtag('js', new Date());
+      gtag('config', GTAG_ID);
+      const script = document.createElement('script');
+      script.src = `https://www.googletagmanager.com/gtag/js?id=${GTAG_ID}`;
+      script.async = true;
+      document.head.appendChild(script);
+      ['scroll', 'mousemove', 'touchstart'].forEach(type => {
+        window.removeEventListener(type, loadGtag);
+      });
+    }
+    window.addEventListener('scroll', loadGtag, { once: true });
+    window.addEventListener('mousemove', loadGtag, { once: true });
+    window.addEventListener('touchstart', loadGtag, { once: true });
+    setTimeout(loadGtag, 4000);
+  </script>
 
 </body>
 
 </html>
+
 
